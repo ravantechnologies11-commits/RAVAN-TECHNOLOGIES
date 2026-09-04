@@ -15,12 +15,28 @@ export function useFounder() {
   useEffect(() => {
     let isMounted = true;
 
+    const refreshFounders = () => {
+      dataService.getFounders(true).then((data) => {
+        if (isMounted) {
+          if (Array.isArray(data)) {
+            setFounders(data);
+            const published = data.filter(f => f.status === 'published');
+            setFounder(published[0] || null);
+          }
+          setLoading(false);
+        }
+      }).catch(() => {
+        if (isMounted) setLoading(false);
+      });
+    };
+
     // 1. Initial fetch from canonical dataService (reads from Supabase / cache)
     dataService.getFounders().then((data) => {
       if (isMounted) {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setFounders(data);
-          setFounder(data[0]);
+          const published = data.filter(f => f.status === 'published');
+          setFounder(published[0] || null);
         }
         setLoading(false);
       }
@@ -31,25 +47,37 @@ export function useFounder() {
     // 2. Real-time event listener for live founder broadcasts
     const handleFounderUpdate = (e: CustomEvent<Founder>) => {
       if (isMounted && e.detail) {
-        setFounder(e.detail);
+        if (e.detail.status === 'published') {
+          setFounder(e.detail);
+        } else {
+          refreshFounders();
+        }
       }
     };
 
     const handleFoundersUpdate = (e: CustomEvent<Founder[]>) => {
       if (isMounted && Array.isArray(e.detail)) {
         setFounders(e.detail);
-        if (e.detail.length > 0) {
-          setFounder(e.detail[0]);
-        }
+        const published = e.detail.filter(f => f.status === 'published');
+        setFounder(published[0] || null);
+      }
+    };
+
+    const handleDataUpdated = (e: any) => {
+      const entity = e?.detail?.entity;
+      if (!entity || entity === 'founder' || entity === 'founders') {
+        refreshFounders();
       }
     };
 
     window.addEventListener('ravan_founder_updated' as any, handleFounderUpdate);
     window.addEventListener('ravan_founders_updated' as any, handleFoundersUpdate);
+    window.addEventListener('ravan_data_updated', handleDataUpdated);
     return () => {
       isMounted = false;
       window.removeEventListener('ravan_founder_updated' as any, handleFounderUpdate);
       window.removeEventListener('ravan_founders_updated' as any, handleFoundersUpdate);
+      window.removeEventListener('ravan_data_updated', handleDataUpdated);
     };
   }, []);
 

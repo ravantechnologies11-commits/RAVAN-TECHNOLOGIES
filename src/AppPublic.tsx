@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { RouteLoadingSkeleton } from './components/common/RouteLoadingSkeleton';
 import { ScrollToTop } from './components/common/ScrollToTop';
@@ -39,6 +39,9 @@ export const AppPublic: React.FC = () => {
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/founder" element={<FounderPage />} />
+        <Route path="/founders" element={<FounderPage />} />
+        <Route path="/founder/:slug" element={<TeamMemberProfilePage />} />
+        <Route path="/founders/:slug" element={<TeamMemberProfilePage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/solutions" element={<SolutionsPage />} />
         <Route path="/hackathons" element={<HackathonsPage />} />

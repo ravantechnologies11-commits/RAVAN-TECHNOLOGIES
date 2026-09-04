@@ -1,17 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { SEOHead } from '../components/common/SEOHead';
 import { SmartImage } from '../components/common/SmartImage';
 import { SocialProfilesList } from '../components/team/SocialProfilesList';
+import { ProfileEducationSection } from '../components/team/ProfileEducationSection';
+import { ProfileExperienceSection } from '../components/team/ProfileExperienceSection';
+import { ProfileProjectsSection } from '../components/team/ProfileProjectsSection';
+import { ProfileSkillsSection } from '../components/team/ProfileSkillsSection';
+import { WorkWithUsModal } from '../components/common/WorkWithUsModal';
 import { useFounder } from '../hooks/useFounder';
 import { buildFounderPersonSchema } from '../lib/seoService';
-import { Quote, Award, Target, CheckCircle2, ArrowRight, Layers } from 'lucide-react';
+import { 
+  Quote, 
+  Award, 
+  Target, 
+  CheckCircle2, 
+  ArrowRight, 
+  ChevronRight,
+  Briefcase, 
+  UserX, 
+  Phone, 
+  ArrowLeft 
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const FounderPage: React.FC = () => {
   const { founder, loading } = useFounder();
+  const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
 
-  if (loading || !founder) {
+  // 1. Loading State
+  if (loading) {
     return (
       <Layout>
         <SEOHead 
@@ -38,14 +56,58 @@ export const FounderPage: React.FC = () => {
     );
   }
 
+  // 2. Not Found or Unpublished State
+  if (!founder || founder.status !== 'published') {
+    return (
+      <Layout>
+        <SEOHead 
+          title="Founder Profile Unavailable — Ravan Technologies"
+          description="The requested executive founder profile is currently not available."
+          noindex={true}
+        />
+        <div className="min-h-[70vh] flex items-center justify-center px-gutter py-24">
+          <div className="max-w-md w-full p-8 md:p-12 rounded-2xl bg-surface border border-outline-variant text-center shadow-xl">
+            <div className="w-16 h-16 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center text-secondary mx-auto mb-6">
+              <UserX className="w-8 h-8" />
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold font-display text-primary mb-3">
+              Founder Profile Unavailable
+            </h1>
+            <p className="text-xs md:text-sm text-on-surface-variant leading-relaxed mb-8">
+              The founder profile is currently in draft mode, under revision, or has been temporarily archived.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Link
+                to="/"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-primary text-white rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-primary-container transition-colors shadow"
+              >
+                <ArrowLeft className="w-4 h-4 text-secondary" />
+                <span>RETURN TO HOME</span>
+              </Link>
+              <Link
+                to="/team"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-surface-container text-primary rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-secondary/15 transition-colors border border-outline-variant"
+              >
+                <span>TEAM DIRECTORY</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // 3. Published Founder Profile with All 7 Sections
+  const founderSlug = founder.slug || 'v-abishek';
+
   return (
     <Layout>
       <SEOHead 
-        title={`${founder.name} — Founder & Chief Architect | Ravan Technologies`}
-        description={founder.vision || founder.bio || 'Architecting sovereign digital infrastructure and enterprise AI at Ravan Technologies.'}
-        ogImage={founder.image_url}
+        title={founder.seo_title || `${founder.name} — Founder & Chief Architect | Ravan Technologies`}
+        description={founder.seo_description || founder.vision || founder.short_intro || founder.bio || 'Architecting sovereign digital infrastructure and enterprise AI at Ravan Technologies.'}
+        ogImage={founder.og_image || founder.image_url}
         ogType="profile"
-        canonical="/founder"
+        canonical={founder.canonical_url || '/founder'}
         breadcrumbs={[
           { name: 'Home', path: '/' },
           { name: 'Founder Address', path: '/founder' }
@@ -53,36 +115,80 @@ export const FounderPage: React.FC = () => {
         mainEntity={buildFounderPersonSchema(founder)}
       />
 
-      {/* Hero: Split Panel Style matching Stitch prototype */}
+      {/* Hero: Split Panel Style */}
       <section className="w-full relative bg-surface overflow-hidden pt-24 pb-20 px-gutter max-w-container-max mx-auto border-b border-outline-variant">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Text Side */}
           <div className="lg:col-span-6 flex flex-col z-10">
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-4">
               <div className="h-px w-10 bg-secondary" />
               <span className="text-xs font-semibold uppercase tracking-widest text-secondary">
                 EXECUTIVE LEADERSHIP
               </span>
             </div>
 
-            <h1 className="text-4xl md:text-6xl font-bold font-display text-primary mb-4 leading-tight tracking-tight">
-              Architecting the Foundation of Sovereign Intelligence.
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-3 py-1 bg-secondary text-[#0a192f] text-[10px] font-bold uppercase tracking-widest rounded shadow-sm">
+                FOUNDER & CHIEF ARCHITECT
+              </span>
+              {founder.company_branch && (
+                <span className="px-3 py-1 bg-surface-container text-primary border border-outline-variant text-[10px] font-bold uppercase tracking-wider rounded">
+                  {founder.company_branch}
+                </span>
+              )}
+            </div>
+
+            <h1 className="text-4xl md:text-6xl font-bold font-display text-primary mb-3 leading-tight tracking-tight">
+              {founder.name}
             </h1>
 
-            <div className="text-lg font-semibold text-secondary mb-4">
-              {founder.name} — <span className="text-on-surface-variant font-normal">{founder.designation}</span>
+            <div className="text-base md:text-lg font-semibold text-secondary mb-4">
+              {founder.designation} {founder.tenure_years && <span className="text-on-surface-variant font-normal normal-case">· {founder.tenure_years}</span>}
             </div>
 
             {founder.vision && (
-              <p className="text-base md:text-lg font-body text-on-surface-variant max-w-xl leading-relaxed mb-6">
+              <p className="text-base md:text-lg font-body text-on-surface-variant max-w-xl leading-relaxed mb-6 italic border-l-2 border-secondary pl-4 py-1">
                 &ldquo;{founder.vision}&rdquo;
               </p>
             )}
 
-            <SocialProfilesList
-              socialLinks={founder.social_links}
-              memberName={founder.name}
-            />
+            <div className="space-y-4 mb-6">
+              <SocialProfilesList
+                socialLinks={founder.social_links}
+                memberName={founder.name}
+                publicEmail={founder.public_email || founder.social_links?.email}
+              />
+
+              {founder.public_phone && (
+                <div className="flex items-center gap-2 text-xs text-on-surface-variant">
+                  <Phone className="w-4 h-4 text-secondary shrink-0" />
+                  <a
+                    href={`tel:${founder.public_phone}`}
+                    className="font-mono text-primary hover:text-secondary transition-colors"
+                  >
+                    {founder.public_phone}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsWorkModalOpen(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-primary-container transition-colors shadow-md"
+              >
+                <span>ENGAGE / CONSULTATION</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              <Link
+                to={`/team/${founderSlug}`}
+                className="inline-flex items-center gap-2 px-5 py-3 bg-surface-container text-primary hover:text-secondary rounded-lg font-bold text-xs uppercase tracking-widest border border-outline-variant hover:border-secondary transition-colors shadow-sm"
+              >
+                <span>EXECUTIVE PROFILE</span>
+                <ChevronRight className="w-4 h-4 text-secondary" />
+              </Link>
+            </div>
           </div>
 
           {/* Image Side - Clean, unobstructed portrait with Premium Motion */}
@@ -139,6 +245,30 @@ export const FounderPage: React.FC = () => {
         </section>
       )}
 
+      {/* Focus Areas */}
+      {founder.focus_areas && founder.focus_areas.length > 0 && (
+        <section className="py-16 bg-surface max-w-container-max mx-auto px-gutter border-b border-outline-variant">
+          <div className="max-w-2xl mb-8">
+            <span className="text-xs font-semibold uppercase tracking-widest text-secondary block mb-2">
+              ARCHITECTURAL FOCUS
+            </span>
+            <h2 className="text-2xl md:text-3xl font-bold font-display text-primary tracking-tight">
+              Core Technical Directives
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {founder.focus_areas.map((area, idx) => (
+              <span
+                key={idx}
+                className="px-4 py-2 rounded-xl bg-surface border border-outline-variant text-xs font-semibold text-primary shadow-sm"
+              >
+                {area}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Achievements / Milestones */}
       {(founder.achievements && founder.achievements.length > 0) && (
         <section className="py-24 bg-surface-container-lowest border-b border-outline-variant">
@@ -167,6 +297,23 @@ export const FounderPage: React.FC = () => {
           </div>
         </section>
       )}
+
+      {/* ============================================================ */}
+      {/* STRUCTURED CORPORATE PROFILE SECTIONS                        */}
+      {/* ============================================================ */}
+      <div className="w-full max-w-container-max mx-auto px-gutter py-16 space-y-16 border-b border-outline-variant">
+        {/* 2. EDUCATION / QUALIFICATIONS */}
+        <ProfileEducationSection education={founder.education} />
+
+        {/* 3. EXPERIENCE */}
+        <ProfileExperienceSection experiences={founder.experience_records} />
+
+        {/* 4. PROJECTS (2-column responsive card grid) */}
+        <ProfileProjectsSection projects={founder.projects} />
+
+        {/* 5. SKILLS / TECHNICAL EXPERTISE (Grouped by Category) */}
+        <ProfileSkillsSection skills={founder.structured_skills} />
+      </div>
 
       {/* Custom Content Sections */}
       {(founder.custom_sections && founder.custom_sections.length > 0) && (
@@ -209,6 +356,12 @@ export const FounderPage: React.FC = () => {
           </Link>
         </div>
       </section>
+
+      <WorkWithUsModal 
+        isOpen={isWorkModalOpen} 
+        onClose={() => setIsWorkModalOpen(false)} 
+        defaultInquiryType={`Executive Consultation: ${founder.name}`}
+      />
     </Layout>
   );
 };

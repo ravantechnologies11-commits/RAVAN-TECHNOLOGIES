@@ -10,7 +10,7 @@ interface FounderSpotlightProps {
 }
 
 export const FounderSpotlight: React.FC<FounderSpotlightProps> = ({ founder, isLoading = false }) => {
-  if (isLoading || !founder) {
+  if (isLoading) {
     return (
       <section className="py-28 relative bg-surface-container-lowest border-y border-outline-variant/60 overflow-hidden" aria-busy="true">
         <div className="max-w-container-max mx-auto px-gutter grid grid-cols-1 md:grid-cols-12 gap-12 lg:gap-20 items-center">
@@ -46,6 +46,10 @@ export const FounderSpotlight: React.FC<FounderSpotlightProps> = ({ founder, isL
         </div>
       </section>
     );
+  }
+
+  if (!founder || founder.status !== 'published') {
+    return null;
   }
 
   return (

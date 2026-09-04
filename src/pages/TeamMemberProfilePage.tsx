@@ -86,8 +86,19 @@ export const TeamMemberProfilePage: React.FC = () => {
 
     loadProfile();
 
+    const handleUpdate = () => {
+      loadProfile();
+    };
+
+    window.addEventListener('ravan_data_updated', handleUpdate);
+    window.addEventListener('ravan_founders_updated' as any, handleUpdate);
+    window.addEventListener('ravan_founder_updated' as any, handleUpdate);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('ravan_data_updated', handleUpdate);
+      window.removeEventListener('ravan_founders_updated' as any, handleUpdate);
+      window.removeEventListener('ravan_founder_updated' as any, handleUpdate);
     };
   }, [slug]);
 
