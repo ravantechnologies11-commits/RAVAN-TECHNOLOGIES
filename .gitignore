@@ -10,7 +10,8 @@ build/
 .env.local
 .env.production
 .env.staging
-.env.*.local
+.env.admin
+.env.*
 
 # IDE / Editor
 .vscode/

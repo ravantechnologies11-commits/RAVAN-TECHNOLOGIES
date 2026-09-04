@@ -241,7 +241,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title }) => 
       >
         {/* Brand Header (Always pinned at top of sidebar) */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between shrink-0 bg-[#0a192f]">
-          <Link to="/" className="flex items-center gap-2 group">
+          <Link to="/admin" className="flex items-center gap-2 group">
             <BrandLogo variant="sidebar" />
           </Link>
           <button
@@ -342,6 +342,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title }) => 
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            <a
+              href="https://ravan-technologies-i99k.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded text-xs font-semibold transition-colors"
+              title="Open public website in a new tab"
+            >
+              <span>Public Portal</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
             {isSupabaseConfigured ? (
               <div className="flex items-center gap-2 px-3 py-1 bg-emerald-950/60 border border-emerald-500/30 rounded text-emerald-400 text-xs font-semibold">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />

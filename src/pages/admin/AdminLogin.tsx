@@ -120,9 +120,14 @@ export const AdminLogin: React.FC = () => {
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-          <Link to="/" className="hover:text-white transition-colors">
-            ← Return to Public Website
-          </Link>
+          <a 
+            href="https://ravan-technologies-i99k.vercel.app" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="hover:text-white transition-colors"
+          >
+            ← View Public Website ↗
+          </a>
           <div className="flex items-center gap-1.5 text-slate-500">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span className="text-[11px]">Supabase Auth Guard</span>
