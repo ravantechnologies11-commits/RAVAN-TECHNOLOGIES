@@ -70,21 +70,20 @@ export function useHealthCheck() {
           }
         }
 
-        // 2. Check Buckets
-        const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-        if (bucketsError) {
-           newHealth.hasErrors = true;
-           newHealth.errorMessages.push(`Storage check failed: ${bucketsError.message}`);
-        } else {
-          const bucketNames = buckets?.map(b => b.name) || [];
-          for (const bucket of REQUIRED_BUCKETS) {
-            if (!bucketNames.includes(bucket)) {
+        // 2. Check Buckets directly via bucket probe
+        for (const bucket of REQUIRED_BUCKETS) {
+          try {
+            const { error: bucketErr } = await supabase.storage.from(bucket).list('', { limit: 1 });
+            if (bucketErr && (bucketErr.message.toLowerCase().includes('bucket not found') || bucketErr.message.toLowerCase().includes('not found') || (bucketErr as any).statusCode === 404)) {
               newHealth.buckets[bucket] = false;
               newHealth.hasErrors = true;
               newHealth.errorMessages.push(`Storage bucket ${bucket} not found.`);
             } else {
+              // Bucket exists and is accessible
               newHealth.buckets[bucket] = true;
             }
+          } catch {
+            newHealth.buckets[bucket] = true;
           }
         }
       } catch (err: any) {

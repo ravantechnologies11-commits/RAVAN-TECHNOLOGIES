@@ -34,6 +34,7 @@ import {
 
 import {
   initialFounder,
+  initialFounders,
   initialLeadership,
   initialServices,
   initialSolutions,
@@ -483,6 +484,136 @@ function normalizeLeadershipMember(m: any): LeadershipMember {
 
     created_at: m.created_at,
     updated_at: m.updated_at
+  };
+}
+
+export function normalizeFounder(raw: any, idx: number = 0): Founder {
+  if (!raw) {
+    return {
+      ...initialFounder,
+      id: `founder-${Date.now()}`,
+      display_order: idx + 1,
+      status: 'draft',
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  const meta = raw?.social_links?._meta || {};
+  const founderId = raw.id || `founder-${Date.now()}-${idx}`;
+
+  // 1. Education
+  const education = parseStructuredEducation(raw.education || meta.education, { ...raw, id: founderId });
+
+  // 2. Projects
+  const projects = parseStructuredProjects(raw.projects || meta.projects, raw.major_projects || meta.major_projects, founderId);
+
+  // 3. Experience
+  const experience_records = parseStructuredExperience(raw.experience_records || meta.experience_records, { ...raw, id: founderId });
+
+  // 4. Skills: Check structured_skills, meta, then parse custom_sections (e.g. V ABISHEK skills) if needed
+  let structured_skills = parseStructuredSkills(raw.structured_skills || meta.structured_skills, raw.skills || meta.skills, founderId);
+  if (structured_skills.length === 0 && Array.isArray(raw.custom_sections)) {
+    const skillsSection = raw.custom_sections.find((s: any) => s.title?.toUpperCase().includes('SKILL'));
+    if (skillsSection && typeof skillsSection.content === 'string') {
+      const parsedFromCustom: ProfileSkill[] = [];
+      const lines = skillsSection.content.split('\n').map((l: string) => l.replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean);
+      let order = 1;
+      for (const line of lines) {
+        const parts = line.split(/[–\-:]/);
+        if (parts.length >= 2) {
+          const catRaw = parts[0].trim().toLowerCase();
+          let category: SkillCategory = 'Other';
+          if (catRaw.includes('program') || catRaw.includes('lang')) category = 'Programming';
+          else if (catRaw.includes('ai') || catRaw.includes('artificial') || catRaw.includes('learning') || catRaw.includes('ml')) category = 'AI / ML';
+          else if (catRaw.includes('web') || catRaw.includes('full-stack') || catRaw.includes('frontend') || catRaw.includes('backend')) category = 'Web Development';
+          else if (catRaw.includes('mobile')) category = 'Mobile Development';
+          else if (catRaw.includes('cloud')) category = 'Cloud';
+          else if (catRaw.includes('data')) category = 'Database';
+          else if (catRaw.includes('devops') || catRaw.includes('git') || catRaw.includes('deploy')) category = 'DevOps';
+          else if (catRaw.includes('hard') || catRaw.includes('embed')) category = 'Hardware';
+          else if (catRaw.includes('design') || catRaw.includes('ui') || catRaw.includes('ux')) category = 'Design';
+          else if (catRaw.includes('manage')) category = 'Management';
+
+          const skillNames = parts[1].split(/[,·]/).map((s: string) => s.trim()).filter(Boolean);
+          for (const sName of skillNames) {
+            parsedFromCustom.push({
+              id: `skill-${founderId}-${order}`,
+              name: sName,
+              category,
+              proficiency: 'Expert',
+              display_order: order++
+            });
+          }
+        } else {
+          parsedFromCustom.push({
+            id: `skill-${founderId}-${order}`,
+            name: line,
+            category: 'Programming',
+            proficiency: 'Advanced',
+            display_order: order++
+          });
+        }
+      }
+      if (parsedFromCustom.length > 0) {
+        structured_skills = parsedFromCustom;
+      }
+    }
+  }
+
+  const name = raw.name || initialFounder.name;
+  const status = raw.status || meta.status || 'published';
+  const slug = raw.slug || meta.slug || generateSlug(name);
+  const company_branch = raw.company_branch || meta.company_branch || 'Ravan Technologies';
+  const display_order = typeof raw.display_order === 'number' ? raw.display_order : (typeof meta.display_order === 'number' ? meta.display_order : idx + 1);
+
+  return {
+    id: founderId,
+    name,
+    designation: raw.designation || initialFounder.designation,
+    company_branch,
+    bio: raw.bio || initialFounder.bio,
+    image_url: raw.image_url || initialFounder.image_url,
+    display_order,
+    status,
+    slug,
+    short_intro: raw.short_intro ?? meta.short_intro ?? raw.bio ?? initialFounder.short_intro ?? '',
+    vision: raw.vision ?? meta.vision ?? initialFounder.vision ?? '',
+    quote: raw.quote ?? meta.quote ?? initialFounder.quote ?? '',
+    quote_author_tag: raw.quote_author_tag ?? meta.quote_author_tag ?? initialFounder.quote_author_tag ?? '',
+    focus_areas: Array.isArray(raw.focus_areas) && raw.focus_areas.length > 0 ? raw.focus_areas : (Array.isArray(meta.focus_areas) && meta.focus_areas.length > 0 ? meta.focus_areas : (initialFounder.focus_areas || [])),
+    tenure_years: raw.tenure_years ?? meta.tenure_years ?? initialFounder.tenure_years ?? '2 Years',
+    achievements: Array.isArray(raw.achievements) && raw.achievements.length > 0 ? raw.achievements : (Array.isArray(meta.achievements) && meta.achievements.length > 0 ? meta.achievements : (initialFounder.achievements || [])),
+    custom_sections: Array.isArray(raw.custom_sections) ? raw.custom_sections : [],
+
+    // Structured Corporate Profile Data
+    education,
+    projects,
+    experience_records,
+    structured_skills,
+
+    // Official Contact & Social
+    public_email: raw.public_email ?? meta.public_email ?? raw.social_links?.email ?? initialFounder.public_email ?? '',
+    public_phone: raw.public_phone ?? meta.public_phone ?? '',
+    social_links: {
+      linkedin: raw.social_links?.linkedin || '',
+      youtube: raw.social_links?.youtube || '',
+      instagram: raw.social_links?.instagram || '',
+      twitter: raw.social_links?.twitter || '',
+      github: raw.social_links?.github || '',
+      facebook: raw.social_links?.facebook || '',
+      website: raw.social_links?.website || '',
+      email: raw.social_links?.email || raw.public_email || '',
+      ...(raw.social_links || {})
+    },
+
+    // SEO Metadata
+    seo_title: raw.seo_title || meta.seo_title || `${name} — Founder & Architect | Ravan Technologies`,
+    seo_description: raw.seo_description || meta.seo_description || raw.bio || '',
+    canonical_url: raw.canonical_url || meta.canonical_url || `/team/${slug}`,
+    og_image: raw.og_image || meta.og_image || raw.image_url || '',
+
+    created_at: raw.created_at,
+    updated_at: raw.updated_at || new Date().toISOString()
   };
 }
 
@@ -1035,52 +1166,200 @@ export const dataService = {
     return normalized;
   },
 
-  // --- FOUNDER ---
-  async getFounder(forceRefresh: boolean = false): Promise<Founder> {
-    if (forceRefresh) memoryCache.invalidate('founder');
-    return memoryCache.dedupedFetch('founder', async () => {
-      const local = getLocal<Founder>('ravan_founder', initialFounder);
+  // --- FOUNDERS MANAGEMENT ---
+  async getFounders(forceRefresh: boolean = false): Promise<Founder[]> {
+    if (forceRefresh) {
+      memoryCache.invalidate('founders');
+      memoryCache.invalidate('founder');
+    }
+    return memoryCache.dedupedFetch('founders', async () => {
+      const local = getLocal<Founder[]>('ravan_founders', initialFounders);
       try {
         if (supabase) {
-          const { data, error } = await supabase.from('founders').select('*').single();
-          if (!error && data) {
-            setLocal('ravan_founder', data);
-            return data as Founder;
+          let data: any[] | null = null;
+          const resWithOrder = await supabase.from('founders').select('*').order('display_order');
+          if (!resWithOrder.error && Array.isArray(resWithOrder.data) && resWithOrder.data.length > 0) {
+            data = resWithOrder.data;
+          } else {
+            const resFallback = await supabase.from('founders').select('*');
+            if (!resFallback.error && Array.isArray(resFallback.data) && resFallback.data.length > 0) {
+              data = resFallback.data;
+            }
+          }
+
+          if (data && data.length > 0) {
+            const normalized = data.map((item, idx) => normalizeFounder(item, idx));
+            normalized.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+            setLocal('ravan_founders', normalized);
+            setLocal('ravan_founder', normalized[0]);
+            memoryCache.set('founder', normalized[0]);
+            return normalized;
           }
         }
       } catch (err) {
-        if (import.meta.env.DEV) console.warn('Supabase getFounder fallback:', err);
+        if (import.meta.env.DEV) console.warn('Supabase getFounders fallback:', err);
       }
-      return local;
+      const mapped = local.map((item, idx) => normalizeFounder(item, idx));
+      mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      return mapped;
     });
   },
 
-  async updateFounder(updated: Partial<Founder>): Promise<Founder> {
-    const current = await this.getFounder();
-    const merged = { ...current, ...updated, updated_at: new Date().toISOString() };
+  async getFounder(forceRefresh: boolean = false): Promise<Founder> {
+    const founders = await this.getFounders(forceRefresh);
+    return founders[0] || normalizeFounder(initialFounder);
+  },
+
+  async getFounderBySlug(slug: string): Promise<Founder | null> {
+    const founders = await this.getFounders();
+    const cleanSlug = (slug || '').toLowerCase().trim();
+    if (!cleanSlug) return null;
+
+    const found = founders.find(f => {
+      if (f.status !== 'published') return false;
+      const explicitSlug = (f.slug || '').toLowerCase();
+      const nameSlug = generateSlug(f.name || '').toLowerCase();
+      if (explicitSlug === cleanSlug) return true;
+      if (nameSlug === cleanSlug) return true;
+      if (f.id.toLowerCase() === cleanSlug) return true;
+
+      // Match common founder aliases for V ABISHEK
+      if (f.id === 'founder-001' && (cleanSlug === 'founder' || cleanSlug === 'v-abishek' || cleanSlug === 'abishek')) {
+        return true;
+      }
+
+      const normalizedName = (f.name || '').toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      if (normalizedName === cleanSlug) return true;
+      if (cleanSlug.length > 3 && (normalizedName.includes(cleanSlug) || cleanSlug.includes(normalizedName))) return true;
+
+      return false;
+    });
+
+    return found || null;
+  },
+
+  async saveFounders(founders: Founder[]): Promise<Founder[]> {
+    const normalized = founders.map((f, idx) => normalizeFounder(f, idx));
 
     if (supabase) {
-      const { error } = await supabase.from('founders').upsert(merged);
+      const rowsForDb = normalized.map(f => {
+        const {
+          slug,
+          company_branch,
+          display_order,
+          status,
+          short_intro,
+          education,
+          projects,
+          experience_records,
+          structured_skills,
+          public_email,
+          public_phone,
+          social_links,
+          seo_title,
+          seo_description,
+          canonical_url,
+          og_image,
+          ...coreFields
+        } = f;
+
+        const packedSocialLinks = {
+          ...(social_links || {}),
+          _meta: {
+            slug,
+            company_branch,
+            display_order,
+            status,
+            short_intro,
+            education,
+            projects,
+            experience_records,
+            structured_skills,
+            public_email,
+            public_phone,
+            seo_title,
+            seo_description,
+            canonical_url,
+            og_image
+          }
+        };
+
+        const payload: Record<string, any> = {
+          id: coreFields.id,
+          name: coreFields.name,
+          designation: coreFields.designation,
+          bio: coreFields.bio,
+          image_url: coreFields.image_url,
+          vision: coreFields.vision,
+          quote: coreFields.quote,
+          quote_author_tag: coreFields.quote_author_tag,
+          focus_areas: coreFields.focus_areas || [],
+          tenure_years: coreFields.tenure_years,
+          achievements: coreFields.achievements || [],
+          custom_sections: coreFields.custom_sections || [],
+          social_links: packedSocialLinks,
+          seo_title,
+          seo_description,
+          updated_at: new Date().toISOString()
+        };
+
+        if (slug) payload.slug = slug;
+        if (company_branch) payload.company_branch = company_branch;
+        if (typeof display_order === 'number') payload.display_order = display_order;
+        if (status) payload.status = status;
+
+        return payload;
+      });
+
+      const { error } = await supabase.from('founders').upsert(rowsForDb);
       if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error updating founders:', error.message);
-        throw formatSupabaseError(error, 'founders');
+        // Fallback without dynamic columns if table lacks them
+        const corePayloads = rowsForDb.map(r => {
+          const { slug, company_branch, display_order, status, ...rest } = r;
+          return rest;
+        });
+        const fallbackRes = await supabase.from('founders').upsert(corePayloads);
+        if (fallbackRes.error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving founders:', fallbackRes.error.message);
+          throw formatSupabaseError(fallbackRes.error, 'founders');
+        }
       }
     }
 
-    setLocal('ravan_founder', merged);
-    memoryCache.set('founder', merged);
+    setLocal('ravan_founders', normalized);
+    setLocal('ravan_founder', normalized[0] || initialFounder);
+    memoryCache.set('founders', normalized);
+    memoryCache.set('founder', normalized[0] || initialFounder);
 
-    // Broadcast update to all components using useFounder hook
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ravan_founder_updated', { detail: merged }));
+      window.dispatchEvent(new CustomEvent('ravan_founders_updated', { detail: normalized }));
+      window.dispatchEvent(new CustomEvent('ravan_founder_updated', { detail: normalized[0] }));
     }
 
     try {
-      await this.addAuditLog('UPDATE', 'FOUNDER', merged.id, `Updated Founder profile for ${merged.name}`);
+      await this.addAuditLog('UPDATE', 'FOUNDERS', undefined, `Updated Founders roster (${normalized.length} founders)`);
     } catch {}
 
     notifyDataUpdated('founder');
-    return merged;
+    return normalized;
+  },
+
+  async updateFounder(updated: Partial<Founder>): Promise<Founder> {
+    const currentFounders = await this.getFounders();
+    const targetId = updated.id || currentFounders[0]?.id || 'founder-001';
+    const index = currentFounders.findIndex(f => f.id === targetId);
+
+    let newFounders: Founder[];
+    if (index >= 0) {
+      newFounders = [...currentFounders];
+      newFounders[index] = { ...newFounders[index], ...updated, updated_at: new Date().toISOString() };
+    } else {
+      newFounders = [...currentFounders, { ...initialFounder, ...updated, updated_at: new Date().toISOString() }];
+    }
+
+    const saved = await this.saveFounders(newFounders);
+    const updatedFounder = saved.find(f => f.id === targetId) || saved[0];
+    return updatedFounder;
   },
 
   // --- LEADERSHIP ---
@@ -2210,6 +2489,40 @@ export const dataService = {
   },
 
   // --- EXPLICIT SUPABASE DELETION METHODS ---
+  async deleteFounder(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('founders').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting founder:', error.message);
+        throw formatSupabaseError(error, 'founders');
+      }
+    }
+
+    const current = await this.getFounders();
+    const updated = current.filter(f => f.id !== id);
+    setLocal('ravan_founders', updated);
+    if (updated.length > 0) {
+      setLocal('ravan_founder', updated[0]);
+    }
+    memoryCache.set('founders', updated);
+    if (updated.length > 0) {
+      memoryCache.set('founder', updated[0]);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ravan_founders_updated', { detail: updated }));
+      if (updated.length > 0) {
+        window.dispatchEvent(new CustomEvent('ravan_founder_updated', { detail: updated[0] }));
+      }
+    }
+
+    try {
+      await this.addAuditLog('DELETE', 'FOUNDERS', id, 'Deleted Founder record');
+    } catch {}
+
+    notifyDataUpdated('founder');
+  },
+
   async deleteLeadership(id: string): Promise<void> {
     if (supabase) {
       const { error } = await supabase.from('leadership').delete().eq('id', id);

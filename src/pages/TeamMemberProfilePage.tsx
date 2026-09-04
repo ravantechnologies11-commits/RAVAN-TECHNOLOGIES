@@ -56,26 +56,18 @@ export const TeamMemberProfilePage: React.FC = () => {
       const cleanSlug = slug.toLowerCase().trim();
 
       try {
-        // 1. Check if slug matches leadership members
-        const leader = await dataService.getLeadershipMemberBySlug(cleanSlug);
-        if (leader && isMounted) {
-          setProfile({ type: 'leadership', member: leader });
+        // 1. Check if slug matches Founder profiles (published only)
+        const founder = await dataService.getFounderBySlug(cleanSlug);
+        if (founder && isMounted) {
+          setProfile({ type: 'founder', member: founder });
           setLoading(false);
           return;
         }
 
-        // 2. Check if slug matches Founder profile
-        const founder = await dataService.getFounder();
-        const founderSlug = generateSlug(founder.name || '');
-        const isFounderMatch = 
-          cleanSlug === founderSlug ||
-          cleanSlug === 'founder' ||
-          cleanSlug === 'v-abishek' ||
-          cleanSlug === 'abishek' ||
-          cleanSlug === founder.id.toLowerCase();
-
-        if (isFounderMatch && isMounted) {
-          setProfile({ type: 'founder', member: founder });
+        // 2. Check if slug matches leadership members (published only)
+        const leader = await dataService.getLeadershipMemberBySlug(cleanSlug);
+        if (leader && isMounted) {
+          setProfile({ type: 'leadership', member: leader });
           setLoading(false);
           return;
         }
@@ -161,11 +153,12 @@ export const TeamMemberProfilePage: React.FC = () => {
     return (
       <Layout>
         <SEOHead 
-          title={`${member.name} — ${member.designation} | Ravan Technologies`}
-          description={member.bio || member.vision || `Executive leadership profile for ${member.name}.`}
-          ogImage={member.image_url}
+          title={member.seo_title || `${member.name} — ${member.designation} | Ravan Technologies`}
+          description={member.seo_description || member.short_intro || member.bio || member.vision || `Executive leadership profile for ${member.name}.`}
+          ogImage={member.og_image || member.image_url}
           ogType="profile"
-          canonical={`/team/${slug}`}
+          canonical={member.canonical_url || `/team/${slug}`}
+          noindex={member.status !== 'published'}
           breadcrumbs={[
             { name: 'Home', path: '/' },
             { name: 'Team Directory', path: '/team' },
@@ -224,8 +217,21 @@ export const TeamMemberProfilePage: React.FC = () => {
                 <SocialProfilesList
                   socialLinks={member.social_links}
                   memberName={member.name}
-                  publicEmail={member.social_links?.email}
+                  publicEmail={member.public_email || member.social_links?.email}
                 />
+
+                {/* Public Phone ONLY if intentionally stored and marked as public */}
+                {member.public_phone && (
+                  <div className="pt-3 border-t border-outline-variant/60 flex items-center gap-2 text-xs text-on-surface-variant">
+                    <Phone className="w-4 h-4 text-secondary shrink-0" />
+                    <a
+                      href={`tel:${member.public_phone}`}
+                      className="font-mono text-primary hover:text-secondary transition-colors truncate"
+                    >
+                      {member.public_phone}
+                    </a>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t border-outline-variant/60 flex flex-col gap-2.5">
                   <Link
@@ -328,6 +334,23 @@ export const TeamMemberProfilePage: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ============================================================ */}
+          {/* STRUCTURED CORPORATE PROFILE SECTIONS                        */}
+          {/* ============================================================ */}
+          <div className="mt-12 space-y-12">
+            {/* 2. EDUCATION / QUALIFICATIONS */}
+            <ProfileEducationSection education={member.education} />
+
+            {/* 3. EXPERIENCE */}
+            <ProfileExperienceSection experiences={member.experience_records} />
+
+            {/* 4. PROJECTS (2-column responsive card grid) */}
+            <ProfileProjectsSection projects={member.projects} />
+
+            {/* 5. SKILLS / TECHNICAL EXPERTISE (Grouped by Category) */}
+            <ProfileSkillsSection skills={member.structured_skills} />
           </div>
         </div>
         <WorkWithUsModal 

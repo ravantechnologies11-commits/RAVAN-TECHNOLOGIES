@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- RAVAN TECHNOLOGIES — PRODUCTION DATABASE & SECURITY HARDENING
 -- Run this in your Supabase Dashboard SQL Editor (click "RUN")
 -- ============================================================================
@@ -49,6 +49,23 @@ ADD COLUMN IF NOT EXISTS hero_subtitle TEXT,
 ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
+-- founders
+ALTER TABLE public.founders 
+ADD COLUMN IF NOT EXISTS company_branch TEXT DEFAULT 'Ravan Technologies',
+ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('draft', 'published', 'archived')),
+ADD COLUMN IF NOT EXISTS slug TEXT,
+ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}'::jsonb,
+ADD COLUMN IF NOT EXISTS custom_sections JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW(),
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='founders' AND column_name='display_order') THEN
+    ALTER TABLE public.founders ADD COLUMN display_order INT NOT NULL DEFAULT 1;
+  END IF;
+END $$;
+
 -- leadership
 ALTER TABLE public.leadership 
 ADD COLUMN IF NOT EXISTS image_url TEXT,
@@ -94,6 +111,10 @@ ADD COLUMN IF NOT EXISTS seo_description TEXT;
 -- ----------------------------------------------------------------------------
 -- 3. PROVISION STORAGE BUCKETS WITH SECURE RLS (Admin Only Mutations)
 -- ----------------------------------------------------------------------------
+
+-- Ensure public select on storage.buckets so client probing does not encounter RLS errors
+DROP POLICY IF EXISTS "Public read buckets" ON storage.buckets;
+CREATE POLICY "Public read buckets" ON storage.buckets FOR SELECT USING (true);
 
 -- site-assets bucket
 INSERT INTO storage.buckets (id, name, public) 

@@ -76,23 +76,39 @@ export interface Founder {
   id: string;
   name: string;
   designation: string;
+  company_branch?: 'Ravan Technologies' | 'Ravan Tech Park' | 'Ravan Film Studio';
   bio: string;
-  vision: string;
-  quote: string;
-  quote_author_tag?: string;
   image_url: string;
-  focus_areas: string[];
-  tenure_years: string;
-  achievements: string[];
-  social_links?: SocialLinks;
-  custom_sections?: { id: string; title: string; content: string }[];
-  seo_title?: string;
-  seo_description?: string;
+  display_order?: number;
+  status?: 'draft' | 'published' | 'archived';
+  slug?: string;
   short_intro?: string;
+  vision?: string;
+  quote?: string;
+  quote_author_tag?: string;
+  focus_areas?: string[];
+  tenure_years?: string;
+  achievements?: string[];
+  custom_sections?: { id: string; title: string; content: string }[];
+  
+  // Structured Corporate Profile Data
   education?: ProfileEducation[];
   projects?: ProfileProject[];
   experience_records?: ProfileExperience[];
   structured_skills?: ProfileSkill[];
+
+  // Official Contact & Social
+  public_email?: string;
+  public_phone?: string;
+  social_links?: SocialLinks;
+
+  // SEO Metadata
+  seo_title?: string;
+  seo_description?: string;
+  canonical_url?: string;
+  og_image?: string;
+
+  created_at?: string;
   updated_at: string;
 }
 

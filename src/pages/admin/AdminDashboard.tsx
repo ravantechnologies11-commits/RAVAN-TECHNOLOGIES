@@ -102,7 +102,7 @@ export const AdminDashboard: React.FC = () => {
               to="/admin/founder"
               className="w-full py-2.5 px-4 bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs font-semibold rounded flex items-center justify-between transition-colors"
             >
-              <span>Update Founder Vision & Bio</span>
+              <span>Manage Founders & Architecture</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
             <Link

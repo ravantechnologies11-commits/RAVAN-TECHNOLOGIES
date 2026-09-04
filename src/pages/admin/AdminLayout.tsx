@@ -52,7 +52,7 @@ let globalAdminSidebarScroll = 0;
 const ROUTE_TITLES: Record<string, string> = {
   '/admin': 'Enterprise CMS Dashboard',
   '/admin/about': 'About Us & Mandate CMS',
-  '/admin/founder': 'Founder & Chief Architect Profile',
+  '/admin/founder': 'Founders & Executive Architects',
   '/admin/leadership': 'Leadership & Executive Team',
   '/admin/services': 'Enterprise Services & Offerings',
   '/admin/solutions': 'Solution Blueprints & Systems',
@@ -136,7 +136,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title }) => 
       label: 'CONTENT',
       items: [
         { name: 'About Us', path: '/admin/about', icon: Info },
-        { name: 'Founder Profile', path: '/admin/founder', icon: UserCheck },
+        { name: 'Founders', path: '/admin/founder', icon: UserCheck },
         { name: 'Leadership Team', path: '/admin/leadership', icon: Users },
         { name: 'Services', path: '/admin/services', icon: Briefcase },
         { name: 'Solutions', path: '/admin/solutions', icon: Layers },

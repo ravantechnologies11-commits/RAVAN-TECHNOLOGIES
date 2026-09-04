@@ -26,11 +26,16 @@ export const initialFounder: Founder = {
   id: 'founder-001',
   name: 'V ABISHEK',
   designation: 'Founder of RAVAN TECHNOLOGIES',
+  company_branch: 'Ravan Technologies',
   bio: 'Architecting sovereign digital infrastructure and enterprise software platforms.',
   vision: 'To engineer self-reliant technology ecosystems that empower institutional autonomy.',
   quote: 'We are not merely building software; we are constructing the digital infrastructure that will dictate the next century of enterprise efficiency. Sovereign Intelligence is the mandate.',
   quote_author_tag: 'Executive Address',
   image_url: 'https://iecesxahkbkkafzmzwcd.supabase.co/storage/v1/object/public/avatars/founder/1788068046599_4p0eqd.jpg',
+  display_order: 1,
+  status: 'published',
+  slug: 'v-abishek',
+  short_intro: 'Architecting sovereign digital infrastructure and enterprise software platforms.',
   focus_areas: [
     'Enterprise Architecture',
     'Sovereign AI Models',
@@ -43,6 +48,18 @@ export const initialFounder: Founder = {
     'Established Ravan Tech Park spanning dedicated R&D infrastructure.',
     'Founded Ravan Hackathon series engaging engineering builders globally.'
   ],
+  custom_sections: [
+    {
+      id: 'custom-1788551949892',
+      title: 'SKILLS',
+      content: '• Programming Languages – Python, JavaScript, C, C++\n• Web Development – HTML, CSS, JavaScript\n• Machine Learning – ML Models, Data Processing\n• Artificial Intelligence – AI Applications, LLM Integration\n• Full-Stack Development – Frontend & Backend\n• Database – MySQL, Firebase, Supabase\n• API Development – REST APIs, API Integration\n• Project Development – Real-World Projects & Applications\n• Git & GitHub – Version Control & Collaboration\n• Deployment – Vercel, Hosting & Deployment\n• UI/UX – Web Interface Design\n• Problem Solving – Debugging & Optimization'
+    }
+  ],
+  education: [],
+  projects: [],
+  experience_records: [],
+  structured_skills: [],
+  public_email: 'founder@ravantechnologies.com',
   social_links: {
     linkedin: 'https://linkedin.com/company/ravantechnologies',
     twitter: 'https://twitter.com/ravantech',
@@ -50,8 +67,12 @@ export const initialFounder: Founder = {
   },
   seo_title: 'V ABISHEK — Founder & Architect | Ravan Technologies',
   seo_description: 'Discover the visionary leadership and engineering philosophy behind Ravan Technologies.',
+  canonical_url: '/team/v-abishek',
+  og_image: 'https://iecesxahkbkkafzmzwcd.supabase.co/storage/v1/object/public/avatars/founder/1788068046599_4p0eqd.jpg',
   updated_at: new Date().toISOString()
 };
+
+export const initialFounders: Founder[] = [initialFounder];
 
 export const initialLeadership: LeadershipMember[] = [
   {

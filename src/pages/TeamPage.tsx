@@ -9,9 +9,13 @@ import { ArrowRight, Users, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const TeamPage: React.FC = () => {
-  const { founder, loading: founderLoading } = useFounder();
+  const { founders, loading: founderLoading } = useFounder();
   const [leadership, setLeadership] = useState<LeadershipMember[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const publishedFounders = (founders || []).filter(f => f.status === 'published');
+  const primaryFounder = publishedFounders[0] || null;
+  const coFounders = publishedFounders.slice(1);
 
   const fetchLeadership = async () => {
     try {
@@ -77,18 +81,18 @@ export const TeamPage: React.FC = () => {
             </div>
           </div>
         </section>
-      ) : founder ? (
+      ) : primaryFounder ? (
         <section className="w-full max-w-container-max mx-auto px-gutter pb-16">
           <div className="p-8 md:p-12 rounded-2xl bg-surface-container-lowest border-2 border-secondary/40 shadow-xl grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             <div className="lg:col-span-4 aspect-[4/5] rounded-xl overflow-hidden shadow-md border border-outline-variant/80 bg-surface-container-lowest relative">
-              {founder.image_url ? (
+              {primaryFounder.image_url ? (
                 <SmartImage
-                  src={founder.image_url}
-                  alt={founder.name}
+                  src={primaryFounder.image_url}
+                  alt={primaryFounder.name}
                   priority={true}
                   className="transition-transform duration-500 w-full h-full object-cover hover:scale-105"
                   containerClassName="w-full h-full bg-transparent"
-                  fallbackText={founder.name}
+                  fallbackText={primaryFounder.name}
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-surface-container text-center">
@@ -109,14 +113,14 @@ export const TeamPage: React.FC = () => {
                 </span>
               </div>
               <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold font-display text-primary mb-2 tracking-tight">
-                {founder.name}
+                {primaryFounder.name}
               </h2>
               <p className="text-sm md:text-base font-semibold text-secondary mb-4">
-                {founder.designation} {founder.tenure_years && <span>— <span className="text-on-surface-variant font-normal">{founder.tenure_years} of Systems Engineering</span></span>}
+                {primaryFounder.designation} {primaryFounder.tenure_years && <span>— <span className="text-on-surface-variant font-normal">{primaryFounder.tenure_years} of Systems Engineering</span></span>}
               </p>
-              {founder.vision && (
+              {primaryFounder.vision && (
                 <p className="text-base text-on-surface-variant leading-relaxed mb-8 italic">
-                  &ldquo;{founder.vision}&rdquo;
+                  &ldquo;{primaryFounder.vision}&rdquo;
                 </p>
               )}
 
@@ -129,7 +133,7 @@ export const TeamPage: React.FC = () => {
                   <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link
-                  to={`/team/${generateSlug(founder.name)}`}
+                  to={`/team/${primaryFounder.slug || generateSlug(primaryFounder.name)}`}
                   className="inline-flex items-center gap-2 px-6 py-4 bg-surface-container text-primary hover:text-secondary rounded font-semibold text-xs tracking-widest uppercase border border-outline-variant hover:border-secondary transition-colors shadow-sm w-fit"
                 >
                   <span>EXECUTIVE PROFILE</span>
@@ -138,6 +142,61 @@ export const TeamPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Co-Founders Roster if multiple published founders exist */}
+          {coFounders.length > 0 && (
+            <div className="mt-8 pt-8 border-t border-outline-variant space-y-6">
+              <div>
+                <span className="text-xs font-semibold uppercase tracking-widest text-secondary block mb-1">
+                  FOUNDING PARTNERS
+                </span>
+                <h3 className="text-xl md:text-2xl font-bold font-display text-primary tracking-tight">
+                  Co-Founders & Architectural Leadership
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {coFounders.map((cf) => {
+                  const cfSlug = cf.slug || generateSlug(cf.name);
+                  return (
+                    <div key={cf.id} className="p-6 rounded-2xl bg-surface-container-lowest border border-outline-variant hover:border-secondary/40 transition-all flex flex-col sm:flex-row gap-5 items-center shadow-md">
+                      <div className="w-28 aspect-[4/5] rounded-xl overflow-hidden border border-outline-variant shrink-0 relative bg-surface-container">
+                        {cf.image_url ? (
+                          <SmartImage
+                            src={cf.image_url}
+                            alt={cf.name}
+                            className="w-full h-full object-cover"
+                            containerClassName="w-full h-full"
+                            fallbackText={cf.name}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-secondary font-bold font-display text-lg">
+                            {cf.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-2 text-center sm:text-left">
+                        <span className="px-2.5 py-0.5 bg-secondary/15 text-secondary text-[10px] font-bold uppercase rounded border border-secondary/30 inline-block">
+                          FOUNDER
+                        </span>
+                        <h4 className="text-lg font-bold font-display text-primary">{cf.name}</h4>
+                        <p className="text-xs font-semibold text-secondary">{cf.designation}</p>
+                        <p className="text-xs text-on-surface-variant line-clamp-2">{cf.short_intro || cf.bio}</p>
+                        <div className="pt-2">
+                          <Link
+                            to={`/team/${cfSlug}`}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-surface-container hover:bg-secondary/15 text-primary hover:text-secondary rounded text-xs font-semibold uppercase tracking-wider border border-outline-variant hover:border-secondary/40 transition-colors"
+                          >
+                            <span>EXECUTIVE PROFILE</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-secondary" />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </section>
       ) : null}
 

@@ -9,16 +9,18 @@ import { Founder } from '../types';
  */
 export function useFounder() {
   const [founder, setFounder] = useState<Founder | null>(null);
+  const [founders, setFounders] = useState<Founder[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
     // 1. Initial fetch from canonical dataService (reads from Supabase / cache)
-    dataService.getFounder().then((data) => {
+    dataService.getFounders().then((data) => {
       if (isMounted) {
-        if (data) {
-          setFounder(data);
+        if (Array.isArray(data) && data.length > 0) {
+          setFounders(data);
+          setFounder(data[0]);
         }
         setLoading(false);
       }
@@ -33,17 +35,34 @@ export function useFounder() {
       }
     };
 
+    const handleFoundersUpdate = (e: CustomEvent<Founder[]>) => {
+      if (isMounted && Array.isArray(e.detail)) {
+        setFounders(e.detail);
+        if (e.detail.length > 0) {
+          setFounder(e.detail[0]);
+        }
+      }
+    };
+
     window.addEventListener('ravan_founder_updated' as any, handleFounderUpdate);
+    window.addEventListener('ravan_founders_updated' as any, handleFoundersUpdate);
     return () => {
       isMounted = false;
       window.removeEventListener('ravan_founder_updated' as any, handleFounderUpdate);
+      window.removeEventListener('ravan_founders_updated' as any, handleFoundersUpdate);
     };
   }, []);
 
   return {
     founder,
+    founders,
     loading,
     founderName: founder?.name || 'Founder',
     founderDesignation: founder?.designation || 'Founder & Chief Architect',
   };
+}
+
+export function useFounders() {
+  const { founders, loading } = useFounder();
+  return { founders, loading };
 }
