@@ -55,18 +55,63 @@ export const initialFounder: Founder = {
 
 export const initialLeadership: LeadershipMember[] = [
   {
+    id: 'lead-001',
+    name: 'A. BERRY SUGANDH SURYA',
+    designation: 'Co-Founder & Chief Operating Officer',
+    company_branch: 'Ravan Technologies',
+    bio: 'Oversees engineering execution, edge computing, distributed software architectures, and institutional partnerships.',
+    image_url: '',
+    display_order: 1,
+    status: 'published',
+    slug: 'a-berry-sugandh-surya',
+    social_links: {
+      linkedin: 'https://linkedin.com/in/berrysugandh-surya-a-68650b396',
+      github: 'https://github.com/Berry1924',
+      twitter: 'https://x.com/BerrySugandh19',
+      whatsapp: 'https://wa.me/916380698291'
+    }
+  },
+  {
     id: 'lead-002',
     name: 'SIBI RAJ U',
     designation: 'CEO — Ravan Technologies',
     company_branch: 'Ravan Tech Park',
     bio: 'Drives enterprise software strategy, core platform delivery, and high-concurrency client architectures.',
     image_url: 'https://iecesxahkbkkafzmzwcd.supabase.co/storage/v1/object/public/avatars/leadership/1788253631161_ho62j1.jpg',
-    display_order: 1,
+    display_order: 2,
     status: 'published',
     slug: 'sibi-raj-u',
     social_links: {
       linkedin: 'https://linkedin.com',
       twitter: 'https://twitter.com'
+    }
+  },
+  {
+    id: 'lead-003',
+    name: 'V.VINOTHKUMAR',
+    designation: 'MANAGER',
+    company_branch: 'Ravan Technologies',
+    bio: 'Leads physical campus innovation, advanced supercomputing clusters, hardware testbeds, and university R&D partnerships.',
+    image_url: 'https://iecesxahkbkkafzmzwcd.supabase.co/storage/v1/object/public/avatars/leadership/1788492358087_n1lya4.jpg',
+    display_order: 3,
+    status: 'published',
+    slug: 'v-vinothkumar',
+    social_links: {
+      linkedin: 'https://www.linkedin.com/in/vinoth-kumar-396180382'
+    }
+  },
+  {
+    id: 'lead-004',
+    name: 'MITHRA.S',
+    designation: 'MANAGER',
+    company_branch: 'Ravan Technologies',
+    bio: 'Pioneering real-time virtual production pipelines, generative media workflows, and cinematic storytelling.',
+    image_url: 'https://iecesxahkbkkafzmzwcd.supabase.co/storage/v1/object/public/avatars/leadership/1788515381289_jbldgw.jpg',
+    display_order: 4,
+    status: 'published',
+    slug: 'mithra-s',
+    social_links: {
+      linkedin: 'https://www.linkedin.com/in/mithra-s-engg-592708382'
     }
   }
 ];
