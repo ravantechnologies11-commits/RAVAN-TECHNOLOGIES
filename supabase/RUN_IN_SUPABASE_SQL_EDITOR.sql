@@ -325,17 +325,67 @@ CREATE POLICY "Only admins can manage projects" ON public.projects FOR ALL TO au
 CREATE TABLE IF NOT EXISTS public.hackathons (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
-  edition TEXT NOT NULL,
-  theme TEXT NOT NULL,
+  edition TEXT,
+  subtitle TEXT,
+  event_date TEXT,
+  time TEXT,
+  location TEXT,
+  registration_url TEXT,
+  status TEXT NOT NULL DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'live', 'completed', 'draft')),
+  focus_statement TEXT,
+  description TEXT,
+  image_url TEXT,
+  banner_url TEXT,
+  additional_images JSONB DEFAULT '[]'::jsonb,
+  solutions_deployed_count TEXT,
+  tracks JSONB DEFAULT '[]'::jsonb,
+  problem_statements JSONB DEFAULT '[]'::jsonb,
+  rules JSONB DEFAULT '[]'::jsonb,
+  prizes JSONB DEFAULT '[]'::jsonb,
+  eligibility TEXT,
+  contact_info TEXT,
+  display_order INT DEFAULT 0,
+  winning_solutions JSONB DEFAULT '[]'::jsonb,
+  theme TEXT,
   registration_deadline TEXT,
   event_dates TEXT,
   prize_pool TEXT,
-  tracks JSONB DEFAULT '[]'::jsonb,
   faq JSONB DEFAULT '[]'::jsonb,
-  rules JSONB DEFAULT '[]'::jsonb,
-  is_registration_open BOOLEAN NOT NULL DEFAULT true,
+  is_registration_open BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Idempotent column additions for pre-existing tables
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS subtitle TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS event_date TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS time TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS registration_url TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'upcoming';
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS focus_statement TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS banner_url TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS additional_images JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS solutions_deployed_count TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS tracks JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS problem_statements JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS rules JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS prizes JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS eligibility TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS contact_info TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS winning_solutions JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS theme TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS registration_deadline TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS event_dates TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS prize_pool TEXT;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS faq JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.hackathons ADD COLUMN IF NOT EXISTS is_registration_open BOOLEAN DEFAULT true;
+ALTER TABLE public.hackathons DROP CONSTRAINT IF EXISTS hackathons_status_check;
+ALTER TABLE public.hackathons ADD CONSTRAINT hackathons_status_check CHECK (status IN ('upcoming', 'live', 'completed', 'draft'));
 
 ALTER TABLE public.hackathons ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Public can view hackathons" ON public.hackathons;

@@ -46,9 +46,9 @@ export const AdminFilmStudio: React.FC = () => {
       const updated = all.map(item => (item.id === studio.id ? studio : item));
       await dataService.saveEcosystem(updated);
       showToast('Ravan Film Studio specifications saved.', 'success');
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to save Film Studio specifications.', 'error');
+    } catch (err: any) {
+      console.error('Error saving Film Studio:', err);
+      showToast(err?.message || 'Failed to save Film Studio specifications.', 'error');
     } finally {
       setIsSaving(false);
     }

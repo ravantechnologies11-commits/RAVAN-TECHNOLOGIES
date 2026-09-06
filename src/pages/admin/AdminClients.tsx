@@ -117,9 +117,9 @@ export const AdminClients: React.FC = () => {
       showToast('Client record saved successfully.', 'success');
       setIsModalOpen(false);
       setEditingItem(null);
-    } catch (e) {
-      console.error(e);
-      showToast('Error saving client record.', 'error');
+    } catch (e: any) {
+      console.error('Error saving client record:', e);
+      showToast(e?.message || 'Error saving client record.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -134,9 +134,9 @@ export const AdminClients: React.FC = () => {
       await dataService.deleteClient(deleteTarget.id);
       showToast(`Deleted client "${deleteTarget.name}".`, 'success');
       setDeleteTarget(null);
-    } catch (e) {
-      console.error(e);
-      showToast('Failed to delete client.', 'error');
+    } catch (e: any) {
+      console.error('Failed to delete client:', e);
+      showToast(e?.message || 'Failed to delete client.', 'error');
     } finally {
       setIsDeleting(false);
     }

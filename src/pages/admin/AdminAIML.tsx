@@ -108,9 +108,9 @@ export const AdminAIML: React.FC = () => {
       showToast('AI/ML model specifications saved successfully.', 'success');
       setIsModalOpen(false);
       setEditingItem(null);
-    } catch (e) {
-      console.error(e);
-      showToast('Error saving AI/ML model.', 'error');
+    } catch (e: any) {
+      console.error('Error saving AI/ML model:', e);
+      showToast(e?.message || 'Error saving AI/ML model.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -125,9 +125,9 @@ export const AdminAIML: React.FC = () => {
       await dataService.deleteAIMLModel(deleteTarget.id);
       showToast(`Deleted AI model "${deleteTarget.name}".`, 'success');
       setDeleteTarget(null);
-    } catch (e) {
-      console.error(e);
-      showToast('Failed to delete AI model.', 'error');
+    } catch (e: any) {
+      console.error('Failed to delete AI model:', e);
+      showToast(e?.message || 'Failed to delete AI model.', 'error');
     } finally {
       setIsDeleting(false);
     }

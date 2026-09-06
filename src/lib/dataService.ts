@@ -7,7 +7,11 @@ import {
   SolutionItem, 
   ProjectItem, 
   HackathonItem, 
+  HackathonTrack,
+  ProblemStatement,
+  WinningSolution,
   LearningProgram, 
+  CurriculumModule,
   EcosystemItem, 
   MediaItem, 
   ContactEnquiry, 
@@ -838,6 +842,305 @@ export function mapSolutionForDb(sol: SolutionItem) {
     is_active: sol.status !== 'draft' && sol.status !== 'archived',
     seo_title: sol.seo_title || `${sol.title} — Solutions | Ravan Technologies`,
     seo_description: sol.seo_description || sol.description || '',
+    updated_at: new Date().toISOString()
+  };
+}
+
+export function normalizeHackathon(raw: any, idx: number = 0): HackathonItem {
+  if (!raw) {
+    return {
+      ...initialHackathon,
+      id: `hackathon-${Date.now()}-${idx}`
+    };
+  }
+
+  // Handle packed metadata from 'faq' (used in legacy schema) or custom metadata
+  const meta = (raw.faq && typeof raw.faq === 'object' && !Array.isArray(raw.faq))
+    ? raw.faq
+    : (raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {});
+
+  const cleanTitle = raw.title || meta.title || 'National Enterprise Hackathon';
+  const cleanEdition = raw.edition || meta.edition || `Vol. ${idx + 1}`;
+  const cleanSubtitle = raw.subtitle || meta.subtitle || raw.theme || '';
+  const cleanEventDate = raw.event_date || meta.event_date || raw.event_dates || 'November 15-17, 2026';
+  const cleanTime = raw.time || meta.time || '09:00 AM - 06:00 PM IST';
+  const cleanLocation = raw.location || meta.location || 'Ravan Tech Park, Thiruvannamalai & Virtual';
+  const cleanRegUrl = raw.registration_url || meta.registration_url || 'https://ravantechnologies.com/hackathons/register';
+
+  // Status mapping
+  let status: 'upcoming' | 'live' | 'completed' | 'draft' = 'upcoming';
+  if (raw.status && ['upcoming', 'live', 'completed', 'draft'].includes(raw.status)) {
+    status = raw.status;
+  } else if (meta.status && ['upcoming', 'live', 'completed', 'draft'].includes(meta.status)) {
+    status = meta.status;
+  } else if (raw.is_registration_open === false) {
+    status = 'completed';
+  }
+
+  const focusStatement = raw.focus_statement || meta.focus_statement || raw.theme || 'Solving mission-critical engineering bottlenecks through distributed computing.';
+  const description = raw.description || meta.description || 'Join top engineering talent to solve real-world problems in high-throughput data processing.';
+  const imageUrl = raw.image_url || meta.image_url || 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=1200';
+  const bannerUrl = raw.banner_url || meta.banner_url || imageUrl;
+  const additionalImages = Array.isArray(raw.additional_images) ? raw.additional_images : (Array.isArray(meta.additional_images) ? meta.additional_images : []);
+  const solutionsDeployed = raw.solutions_deployed_count || meta.solutions_deployed_count || '25+ Systems';
+
+  // Tracks: can come from raw.tracks
+  let tracks: HackathonTrack[] = [];
+  if (Array.isArray(raw.tracks) && raw.tracks.length > 0) {
+    tracks = raw.tracks;
+  } else if (Array.isArray(meta.tracks) && meta.tracks.length > 0) {
+    tracks = meta.tracks;
+  } else {
+    tracks = [
+      { id: 'trk-1', title: 'Sovereign AI', description: 'Fine-tuned LLM architectures and edge inference.' },
+      { id: 'trk-2', title: 'High-Concurrency Systems', description: 'Fault-tolerant distributed transactional pipelines.' }
+    ];
+  }
+
+  // Problem Statements
+  let problemStatements: ProblemStatement[] = [];
+  if (Array.isArray(raw.problem_statements) && raw.problem_statements.length > 0) {
+    problemStatements = raw.problem_statements;
+  } else if (Array.isArray(meta.problem_statements) && meta.problem_statements.length > 0) {
+    problemStatements = meta.problem_statements;
+  }
+
+  // Rules
+  let rules: string[] = [];
+  if (Array.isArray(raw.rules) && raw.rules.length > 0) {
+    rules = raw.rules;
+  } else if (Array.isArray(meta.rules) && meta.rules.length > 0) {
+    rules = meta.rules;
+  } else {
+    rules = [
+      'Teams must consist of 2 to 4 eligible developers.',
+      'All code submissions must be licensed or open for architecture review.',
+      'Pre-built closed solutions are disqualified; boilerplate is allowed.'
+    ];
+  }
+
+  // Prizes
+  let prizes: string[] = [];
+  if (Array.isArray(raw.prizes) && raw.prizes.length > 0) {
+    prizes = raw.prizes;
+  } else if (Array.isArray(meta.prizes) && meta.prizes.length > 0) {
+    prizes = meta.prizes;
+  } else if (raw.prize_pool) {
+    prizes = [String(raw.prize_pool)];
+  } else {
+    prizes = [
+      '1st Place: INR 5,00,000 + Incubation at Ravan Tech Park',
+      '2nd Place: INR 2,50,000 + Cloud Computing Credits',
+      '3rd Place: INR 1,00,000'
+    ];
+  }
+
+  const eligibility = raw.eligibility || meta.eligibility || 'Open to engineering students, senior developers, and independent researchers worldwide.';
+  const contactInfo = raw.contact_info || meta.contact_info || 'hackathons@ravantechnologies.com';
+  const displayOrder = typeof raw.display_order === 'number' ? raw.display_order : (typeof meta.display_order === 'number' ? meta.display_order : idx + 1);
+  const winningSolutions: WinningSolution[] = Array.isArray(raw.winning_solutions) ? raw.winning_solutions : (Array.isArray(meta.winning_solutions) ? meta.winning_solutions : []);
+
+  return {
+    id: String(raw.id || `hackathon-${Date.now()}-${idx}`),
+    title: cleanTitle,
+    edition: cleanEdition,
+    subtitle: cleanSubtitle,
+    event_date: cleanEventDate,
+    time: cleanTime,
+    location: cleanLocation,
+    registration_url: cleanRegUrl,
+    status,
+    focus_statement: focusStatement,
+    description,
+    image_url: imageUrl,
+    banner_url: bannerUrl,
+    additional_images: additionalImages,
+    solutions_deployed_count: solutionsDeployed,
+    tracks,
+    problem_statements: problemStatements,
+    rules,
+    prizes,
+    eligibility,
+    contact_info: contactInfo,
+    display_order: displayOrder,
+    winning_solutions: winningSolutions
+  };
+}
+
+export function mapHackathonForDb(h: HackathonItem) {
+  return {
+    id: h.id,
+    title: h.title,
+    edition: h.edition,
+    subtitle: h.subtitle || '',
+    event_date: h.event_date,
+    time: h.time || '',
+    location: h.location || '',
+    registration_url: h.registration_url || '',
+    status: h.status === 'draft' ? 'upcoming' : h.status,
+    focus_statement: h.focus_statement,
+    description: h.description,
+    image_url: h.image_url,
+    banner_url: h.banner_url || h.image_url,
+    additional_images: Array.isArray(h.additional_images) ? h.additional_images : [],
+    solutions_deployed_count: h.solutions_deployed_count || '0',
+    tracks: Array.isArray(h.tracks) ? h.tracks : [],
+    problem_statements: Array.isArray(h.problem_statements) ? h.problem_statements : [],
+    rules: Array.isArray(h.rules) ? h.rules : [],
+    prizes: Array.isArray(h.prizes) ? h.prizes : [],
+    eligibility: h.eligibility || '',
+    contact_info: h.contact_info || '',
+    display_order: typeof h.display_order === 'number' ? h.display_order : 0,
+    winning_solutions: Array.isArray(h.winning_solutions) ? h.winning_solutions : [],
+    updated_at: new Date().toISOString()
+  };
+}
+
+export function mapHackathonForLegacyDb(h: HackathonItem) {
+  const packedMeta = {
+    subtitle: h.subtitle || '',
+    time: h.time || '',
+    location: h.location || '',
+    registration_url: h.registration_url || '',
+    status: h.status,
+    focus_statement: h.focus_statement,
+    description: h.description,
+    image_url: h.image_url,
+    banner_url: h.banner_url || h.image_url,
+    additional_images: Array.isArray(h.additional_images) ? h.additional_images : [],
+    solutions_deployed_count: h.solutions_deployed_count,
+    problem_statements: Array.isArray(h.problem_statements) ? h.problem_statements : [],
+    prizes: Array.isArray(h.prizes) ? h.prizes : [],
+    eligibility: h.eligibility || '',
+    contact_info: h.contact_info || '',
+    display_order: h.display_order ?? 0,
+    winning_solutions: Array.isArray(h.winning_solutions) ? h.winning_solutions : []
+  };
+
+  return {
+    id: h.id,
+    title: h.title,
+    edition: h.edition,
+    theme: h.focus_statement || h.subtitle || h.title,
+    registration_deadline: h.event_date || 'TBA',
+    event_dates: h.event_date || 'TBA',
+    prize_pool: Array.isArray(h.prizes) ? h.prizes.join('; ') : (typeof h.prizes === 'string' ? h.prizes : 'INR 8,50,000'),
+    tracks: Array.isArray(h.tracks) ? h.tracks : [],
+    rules: Array.isArray(h.rules) ? h.rules : [],
+    faq: packedMeta,
+    is_registration_open: h.status !== 'completed',
+    updated_at: new Date().toISOString()
+  };
+}
+
+export function normalizeLearningProgram(raw: any, idx: number = 0): LearningProgram {
+  if (!raw) {
+    return (initialLearningPrograms[idx] || initialLearningPrograms[0]);
+  }
+
+  // Unpack metadata from 'modules' if packed as object
+  const meta = (raw.modules && typeof raw.modules === 'object' && !Array.isArray(raw.modules))
+    ? raw.modules
+    : {};
+
+  const cleanTitle = raw.title || meta.title || 'Advanced Enterprise Architecture';
+  const cleanSlug = raw.slug || meta.slug || generateSlug(cleanTitle);
+
+  let curriculum: CurriculumModule[] = [];
+  if (Array.isArray(raw.curriculum) && raw.curriculum.length > 0) {
+    curriculum = raw.curriculum;
+  } else if (Array.isArray(meta.curriculum) && meta.curriculum.length > 0) {
+    curriculum = meta.curriculum;
+  } else if (Array.isArray(raw.modules) && raw.modules.length > 0) {
+    curriculum = raw.modules.map((m: any, mIdx: number) => ({
+      id: m.id || `mod-${mIdx}`,
+      title: m.title || `Module ${mIdx + 1}`,
+      level: m.level || 'Foundational',
+      duration: m.duration || '2 Weeks',
+      topics: Array.isArray(m.topics) ? m.topics : []
+    }));
+  }
+
+  let prerequisites: string[] = [];
+  if (Array.isArray(raw.prerequisites)) {
+    prerequisites = raw.prerequisites;
+  } else if (typeof raw.prerequisites === 'string' && raw.prerequisites.trim()) {
+    prerequisites = raw.prerequisites.split(/[,;\n]/).map((p: string) => p.trim()).filter(Boolean);
+  } else if (Array.isArray(meta.prerequisites)) {
+    prerequisites = meta.prerequisites;
+  }
+
+  return {
+    id: String(raw.id || `prog-${Date.now()}-${idx}`),
+    slug: cleanSlug,
+    title: cleanTitle,
+    track_name: raw.track_name || meta.track_name || raw.level || 'Systems Engineering',
+    badge: raw.badge || meta.badge || 'ADVANCED',
+    description: raw.description || meta.description || '',
+    enrolled_count: raw.enrolled_count || meta.enrolled_count || '1,200+ Engineers',
+    image_url: raw.image_url || meta.image_url || 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800',
+    video_url: raw.video_url || meta.video_url,
+    external_url: raw.external_url || meta.external_url,
+    instructor_info: raw.instructor_info || meta.instructor_info,
+    category: raw.category || meta.category || 'Engineering',
+    methodology_phase: raw.methodology_phase || meta.methodology_phase || 'Phase 1: Architecture',
+    curriculum,
+    prerequisites,
+    display_order: typeof raw.display_order === 'number' ? raw.display_order : idx + 1,
+    status: raw.status || meta.status || (raw.is_active === false ? 'draft' : 'published')
+  };
+}
+
+export function mapLearningProgramForDb(p: LearningProgram) {
+  return {
+    id: p.id,
+    slug: p.slug || generateSlug(p.title),
+    title: p.title,
+    track_name: p.track_name,
+    badge: p.badge,
+    description: p.description,
+    enrolled_count: p.enrolled_count,
+    image_url: p.image_url,
+    video_url: p.video_url || '',
+    external_url: p.external_url || '',
+    instructor_info: p.instructor_info || '',
+    category: p.category || '',
+    methodology_phase: p.methodology_phase,
+    curriculum: Array.isArray(p.curriculum) ? p.curriculum : [],
+    prerequisites: Array.isArray(p.prerequisites) ? p.prerequisites : [],
+    display_order: typeof p.display_order === 'number' ? p.display_order : 0,
+    status: p.status,
+    updated_at: new Date().toISOString()
+  };
+}
+
+export function mapLearningProgramForLegacyDb(p: LearningProgram) {
+  const packedMeta = {
+    slug: p.slug || generateSlug(p.title),
+    track_name: p.track_name,
+    badge: p.badge,
+    enrolled_count: p.enrolled_count,
+    image_url: p.image_url,
+    video_url: p.video_url || '',
+    external_url: p.external_url || '',
+    instructor_info: p.instructor_info || '',
+    category: p.category || '',
+    methodology_phase: p.methodology_phase,
+    curriculum: Array.isArray(p.curriculum) ? p.curriculum : [],
+    status: p.status
+  };
+
+  return {
+    id: p.id,
+    title: p.title,
+    level: p.category || p.track_name || 'Advanced',
+    duration: '12 Weeks',
+    prerequisites: Array.isArray(p.prerequisites) ? p.prerequisites.join(', ') : '',
+    description: p.description,
+    modules: packedMeta,
+    outcomes: [],
+    display_order: typeof p.display_order === 'number' ? p.display_order : 0,
+    is_active: p.status !== 'draft' && p.status !== 'archived',
     updated_at: new Date().toISOString()
   };
 }
@@ -1987,16 +2290,21 @@ export const dataService = {
       const local = getLocal<HackathonItem[]>('ravan_hackathons_list', [initialHackathon]);
       try {
         if (supabase) {
-          const { data, error } = await supabase.from('hackathons').select('*').order('created_at', { ascending: false });
+          const { data, error } = await supabase.from('hackathons').select('*').order('updated_at', { ascending: false });
           if (!error && Array.isArray(data) && data.length > 0) {
-            setLocal('ravan_hackathons_list', data);
-            return data as HackathonItem[];
+            const mapped = data.map((d, idx) => normalizeHackathon(d, idx));
+            setLocal('ravan_hackathons_list', mapped);
+            if (mapped.length > 0) {
+              setLocal('ravan_hackathon', mapped[0]);
+              memoryCache.set('hackathons', mapped[0]);
+            }
+            return mapped;
           }
         }
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getHackathons fallback:', err);
       }
-      return local;
+      return (Array.isArray(local) && local.length > 0) ? local.map((d, idx) => normalizeHackathon(d, idx)) : [initialHackathon];
     });
   },
 
@@ -2014,27 +2322,63 @@ export const dataService = {
   },
 
   async saveHackathons(hackathons: HackathonItem[]): Promise<HackathonItem[]> {
+    const normalizedHackathons = hackathons.map((h, idx) => normalizeHackathon(h, idx));
+
     if (supabase) {
-      const { error } = await supabase.from('hackathons').upsert(hackathons);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving hackathons:', error.message);
-        throw formatSupabaseError(error, 'hackathons');
+      // 1. Detect and purge deleted hackathon records
+      try {
+        const { data: existing } = await supabase.from('hackathons').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(normalizedHackathons.map(h => h.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('hackathons').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase hackathons deletion sync notice:', delErr);
+      }
+
+      // 2. Try primary modern schema upsert
+      const modernRows = normalizedHackathons.map(mapHackathonForDb);
+      const { error: modernError } = await supabase.from('hackathons').upsert(modernRows);
+
+      if (modernError) {
+        // If modern schema columns are missing or check constraint fails, fall back to legacy schema mapping
+        const isSchemaMismatch = 
+          modernError.message.includes('schema cache') || 
+          modernError.message.toLowerCase().includes('column') ||
+          modernError.code === '42703' ||
+          modernError.code === 'PGRST204' ||
+          modernError.message.toLowerCase().includes('constraint');
+
+        if (isSchemaMismatch) {
+          const legacyRows = normalizedHackathons.map(mapHackathonForLegacyDb);
+          const { error: legacyError } = await supabase.from('hackathons').upsert(legacyRows);
+          if (legacyError) {
+            if (import.meta.env.DEV) console.error('Supabase legacy hackathons fallback error:', legacyError.message);
+            throw formatSupabaseError(legacyError, 'hackathons');
+          }
+        } else {
+          if (import.meta.env.DEV) console.error('Supabase error saving hackathons:', modernError.message);
+          throw formatSupabaseError(modernError, 'hackathons');
+        }
       }
     }
 
-    setLocal('ravan_hackathons_list', hackathons);
-    if (hackathons.length > 0) {
-      setLocal('ravan_hackathon', hackathons[0]);
-      memoryCache.set('hackathons', hackathons[0]);
+    setLocal('ravan_hackathons_list', normalizedHackathons);
+    if (normalizedHackathons.length > 0) {
+      setLocal('ravan_hackathon', normalizedHackathons[0]);
+      memoryCache.set('hackathons', normalizedHackathons[0]);
     }
-    memoryCache.set('hackathons_list', hackathons);
+    memoryCache.set('hackathons_list', normalizedHackathons);
 
     try {
-      await this.addAuditLog('UPDATE', 'HACKATHONS', undefined, `Updated hackathons (${hackathons.length} events)`);
+      await this.addAuditLog('UPDATE', 'HACKATHONS', undefined, `Updated hackathons (${normalizedHackathons.length} events)`);
     } catch {}
 
     notifyDataUpdated('hackathons');
-    return hackathons;
+    return normalizedHackathons;
   },
 
   async deleteHackathon(id: string): Promise<void> {
@@ -2053,6 +2397,9 @@ export const dataService = {
       setLocal('ravan_hackathon', updated[0]);
       memoryCache.set('hackathons', updated[0]);
     }
+    try {
+      await this.addAuditLog('DELETE', 'HACKATHONS', id, `Deleted hackathon (${id})`);
+    } catch {}
     notifyDataUpdated('hackathons');
   },
 
@@ -2064,35 +2411,70 @@ export const dataService = {
         if (supabase) {
           const { data, error } = await supabase.from('learning_programs').select('*').order('display_order').limit(100);
           if (!error && Array.isArray(data) && data.length > 0) {
-            setLocal('ravan_learning', data);
-            return data as LearningProgram[];
+            const mapped = data.map((d, idx) => normalizeLearningProgram(d, idx));
+            setLocal('ravan_learning', mapped);
+            return mapped;
           }
         }
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getLearningPrograms fallback:', err);
       }
-      return local;
+      return (Array.isArray(local) && local.length > 0) ? local.map((d, idx) => normalizeLearningProgram(d, idx)) : initialLearningPrograms;
     });
   },
 
   async saveLearningPrograms(programs: LearningProgram[]): Promise<LearningProgram[]> {
+    const normalizedPrograms = programs.map((p, idx) => normalizeLearningProgram(p, idx));
+
     if (supabase) {
-      const { error } = await supabase.from('learning_programs').upsert(programs);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving learning_programs:', error.message);
-        throw formatSupabaseError(error, 'learning_programs');
+      // 1. Detect and purge deleted records
+      try {
+        const { data: existing } = await supabase.from('learning_programs').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(normalizedPrograms.map(p => p.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('learning_programs').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase learning_programs deletion sync notice:', delErr);
+      }
+
+      // 2. Try primary modern schema upsert
+      const modernRows = normalizedPrograms.map(mapLearningProgramForDb);
+      const { error: modernError } = await supabase.from('learning_programs').upsert(modernRows);
+
+      if (modernError) {
+        const isSchemaMismatch = 
+          modernError.message.includes('schema cache') || 
+          modernError.message.toLowerCase().includes('column') ||
+          modernError.code === '42703' ||
+          modernError.code === 'PGRST204';
+
+        if (isSchemaMismatch) {
+          const legacyRows = normalizedPrograms.map(mapLearningProgramForLegacyDb);
+          const { error: legacyError } = await supabase.from('learning_programs').upsert(legacyRows);
+          if (legacyError) {
+            if (import.meta.env.DEV) console.error('Supabase legacy learning fallback error:', legacyError.message);
+            throw formatSupabaseError(legacyError, 'learning_programs');
+          }
+        } else {
+          if (import.meta.env.DEV) console.error('Supabase error saving learning_programs:', modernError.message);
+          throw formatSupabaseError(modernError, 'learning_programs');
+        }
       }
     }
 
-    setLocal('ravan_learning', programs);
-    memoryCache.set('learning', programs);
+    setLocal('ravan_learning', normalizedPrograms);
+    memoryCache.set('learning', normalizedPrograms);
 
     try {
-      await this.addAuditLog('UPDATE', 'LEARNING', undefined, `Updated learning tracks (${programs.length} programs)`);
+      await this.addAuditLog('UPDATE', 'LEARNING', undefined, `Updated learning tracks (${normalizedPrograms.length} programs)`);
     } catch {}
 
     notifyDataUpdated('learning');
-    return programs;
+    return normalizedPrograms;
   },
 
   async deleteLearningProgram(id: string): Promise<void> {
@@ -2107,6 +2489,9 @@ export const dataService = {
     const updated = current.filter(p => p.id !== id);
     setLocal('ravan_learning', updated);
     memoryCache.set('learning', updated);
+    try {
+      await this.addAuditLog('DELETE', 'LEARNING', id, `Deleted learning program (${id})`);
+    } catch {}
     notifyDataUpdated('learning');
   },
 
@@ -2152,19 +2537,19 @@ export const dataService = {
   async saveAIMLModels(models: AIMLModel[]): Promise<AIMLModel[]> {
     if (supabase) {
       try {
-        const solutionsPayload = models.map(m => ({
+        const solutionsPayload = models.map(m => mapSolutionForDb({
           id: m.id.startsWith('sol-') ? m.id : `sol-${m.id}`,
           slug: `aiml-${m.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
           title: m.name,
           category: 'ai_model',
           description: m.description,
           architecture_details: m.model_type,
-          technologies: m.capabilities,
-          benefits: m.use_cases,
+          benefits: m.use_cases || [],
           image_url: m.image_url || '',
+          technologies: m.capabilities || [],
           cta_url: m.documentation_url || '',
           display_order: m.display_order,
-          status: m.status,
+          status: m.status || 'published',
           metrics: {
             provider: m.provider,
             version: m.version,
@@ -2734,8 +3119,13 @@ export const dataService = {
     if (supabase) {
       const { error } = await supabase.from('gallery_albums').upsert(albums);
       if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving gallery_albums:', error.message);
-        throw formatSupabaseError(error, 'gallery_albums');
+        const isTableMissing = error.message.includes('schema cache') || error.message.includes('Could not find the table');
+        if (isTableMissing) {
+          if (import.meta.env.DEV) console.warn('Supabase gallery_albums table missing; saving to local cache. Run migration 00003 to enable database sync.');
+        } else {
+          if (import.meta.env.DEV) console.error('Supabase error saving gallery_albums:', error.message);
+          throw formatSupabaseError(error, 'gallery_albums');
+        }
       }
     }
 
@@ -2996,14 +3386,14 @@ export const dataService = {
     if (supabase) {
       const { error } = await supabase.from('clients').upsert(items);
       if (error) {
-        // Fallback with core columns if status/description are omitted in DB schema
+        // Fallback with core columns verified on live PostgreSQL schema
         try {
           const coreItems = items.map(c => ({
             id: c.id,
             name: c.name,
             logo_url: c.logo_url,
-            industry: c.industry,
-            display_order: c.display_order
+            display_order: typeof c.display_order === 'number' ? c.display_order : 0,
+            is_active: c.status !== 'draft'
           }));
           await supabase.from('clients').upsert(coreItems);
         } catch (coreErr) {
@@ -3217,8 +3607,11 @@ export const dataService = {
     if (supabase) {
       const { error } = await supabase.from('gallery_albums').delete().eq('id', id);
       if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error deleting gallery album:', error.message);
-        throw formatSupabaseError(error, 'gallery_albums');
+        const isTableMissing = error.message.includes('schema cache') || error.message.includes('Could not find the table');
+        if (!isTableMissing) {
+          if (import.meta.env.DEV) console.error('Supabase error deleting gallery album:', error.message);
+          throw formatSupabaseError(error, 'gallery_albums');
+        }
       }
     }
 

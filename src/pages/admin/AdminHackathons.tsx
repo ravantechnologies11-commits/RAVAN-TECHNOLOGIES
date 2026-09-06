@@ -133,9 +133,9 @@ export const AdminHackathons: React.FC = () => {
       showToast('Hackathon event saved successfully.', 'success');
       setIsModalOpen(false);
       setEditingItem(null);
-    } catch (e) {
-      console.error(e);
-      showToast('Error saving hackathon.', 'error');
+    } catch (e: any) {
+      console.error('Error saving hackathon:', e);
+      showToast(e?.message || 'Error saving hackathon.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -150,9 +150,9 @@ export const AdminHackathons: React.FC = () => {
       await dataService.deleteHackathon(deleteTarget.id);
       showToast(`Deleted hackathon "${deleteTarget.title}".`, 'success');
       setDeleteTarget(null);
-    } catch (e) {
-      console.error(e);
-      showToast('Failed to delete hackathon.', 'error');
+    } catch (e: any) {
+      console.error('Failed to delete hackathon:', e);
+      showToast(e?.message || 'Failed to delete hackathon.', 'error');
     } finally {
       setIsDeleting(false);
     }

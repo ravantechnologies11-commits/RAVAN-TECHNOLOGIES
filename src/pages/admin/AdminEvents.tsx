@@ -132,9 +132,9 @@ export const AdminEvents: React.FC = () => {
       showToast('Event schedule saved successfully.', 'success');
       setIsModalOpen(false);
       setEditingItem(null);
-    } catch (err) {
-      console.error(err);
-      showToast('Error saving event.', 'error');
+    } catch (err: any) {
+      console.error('Error saving event:', err);
+      showToast(err?.message || 'Error saving event.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -149,9 +149,9 @@ export const AdminEvents: React.FC = () => {
       await dataService.deleteEvent(deleteTarget.id);
       showToast(`Deleted event "${deleteTarget.title}".`, 'success');
       setDeleteTarget(null);
-    } catch (err) {
-      console.error(err);
-      showToast('Failed to delete event.', 'error');
+    } catch (err: any) {
+      console.error('Failed to delete event:', err);
+      showToast(err?.message || 'Failed to delete event.', 'error');
     } finally {
       setIsDeleting(false);
     }

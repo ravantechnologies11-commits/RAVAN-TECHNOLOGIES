@@ -130,9 +130,9 @@ export const AdminBlog: React.FC = () => {
       showToast('Article saved successfully.', 'success');
       setIsModalOpen(false);
       setEditingItem(null);
-    } catch (e) {
-      console.error(e);
-      showToast('Error saving article.', 'error');
+    } catch (e: any) {
+      console.error('Error saving article:', e);
+      showToast(e?.message || 'Error saving article.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -147,9 +147,9 @@ export const AdminBlog: React.FC = () => {
       await dataService.deleteBlogPost(deleteTarget.id);
       showToast(`Deleted whitepaper "${deleteTarget.title}".`, 'success');
       setDeleteTarget(null);
-    } catch (e) {
-      console.error(e);
-      showToast('Failed to delete article.', 'error');
+    } catch (e: any) {
+      console.error('Failed to delete article:', e);
+      showToast(e?.message || 'Failed to delete article.', 'error');
     } finally {
       setIsDeleting(false);
     }
