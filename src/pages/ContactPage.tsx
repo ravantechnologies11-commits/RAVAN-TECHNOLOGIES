@@ -70,7 +70,7 @@ export const ContactPage: React.FC = () => {
 
   const contactEmail = site?.contact_email || 'ravantechnology001@gmail.com';
   const contactPhone = site?.contact_phone || '';
-  const officeAddress = site?.office_address || 'Ravan Tech Park, Outer Ring Road, Bengaluru';
+  const officeAddress = site?.hq_location || site?.office_address || 'Thiruvannamalai, Tamil Nadu, India';
 
   return (
     <Layout>

@@ -29,7 +29,8 @@ import {
   ProfileProject,
   ProfileExperience,
   ProfileSkill,
-  SkillCategory
+  SkillCategory,
+  AIMLModel
 } from '../types';
 
 import {
@@ -54,7 +55,8 @@ import {
   initialTestimonials,
   initialPartners,
   initialClients,
-  initialRoles
+  initialRoles,
+  initialAIMLModels
 } from '../data/initialData';
 
 // High-Performance In-Memory & SWR Cache Store for 100k+ visitor scalability
@@ -1012,9 +1014,19 @@ export const dataService = {
           const { data, error } = await supabase.from('site_settings').select('*').single();
           if (!error && data) {
             const meta = data?.social_links?._meta || {};
+            const cleanOfficeAddress = (data.office_address && !data.office_address.includes('Bengaluru'))
+              ? data.office_address
+              : (meta.office_address || initialSiteSettings.office_address);
+
             const normalized: SiteSettings = {
               ...initialSiteSettings,
               ...data,
+              office_address: cleanOfficeAddress,
+              hq_location: data.hq_location || meta.hq_location || cleanOfficeAddress || 'Thiruvannamalai, Tamil Nadu, India',
+              hq_label: data.hq_label || meta.hq_label || 'Global Headquarters',
+              hq_city: data.hq_city || meta.hq_city || 'Thiruvannamalai',
+              hq_state: data.hq_state || meta.hq_state || 'Tamil Nadu',
+              hq_country: data.hq_country || meta.hq_country || 'India',
               hero_image_url: (data.hero_image_url !== undefined && data.hero_image_url !== null)
                 ? data.hero_image_url
                 : (meta.hero_image_url !== undefined && meta.hero_image_url !== null ? meta.hero_image_url : ''),
@@ -1058,7 +1070,13 @@ export const dataService = {
           hero_image_zoom: merged.hero_image_zoom,
           hero_badge_text: merged.hero_badge_text,
           hero_title: merged.hero_title,
-          hero_subtitle: merged.hero_subtitle
+          hero_subtitle: merged.hero_subtitle,
+          hq_location: merged.hq_location,
+          hq_label: merged.hq_label,
+          hq_city: merged.hq_city,
+          hq_state: merged.hq_state,
+          hq_country: merged.hq_country,
+          office_address: merged.office_address
         }
       };
 
@@ -1083,13 +1101,14 @@ export const dataService = {
         updated_at: new Date().toISOString()
       };
 
-      // Try saving with direct hero columns first
+      // Try saving with direct hero & hq columns first
       const { error } = await supabase.from('site_settings').upsert({
         ...payload,
         hero_image_url: merged.hero_image_url,
         hero_image_alt: merged.hero_image_alt,
         hero_image_focal_x: merged.hero_image_focal_x,
-        hero_image_focal_y: merged.hero_image_focal_y
+        hero_image_focal_y: merged.hero_image_focal_y,
+        hq_location: merged.hq_location
       });
 
       if (error) {
@@ -1659,41 +1678,82 @@ export const dataService = {
 
   // --- HACKATHONS ---
   async getHackathon(): Promise<HackathonItem> {
-    return memoryCache.dedupedFetch('hackathons', async () => {
-      const local = getLocal<HackathonItem>('ravan_hackathon', initialHackathon);
+    const list = await this.getHackathons();
+    return list.find(h => h.status !== 'draft') || list[0] || initialHackathon;
+  },
+
+  async getHackathons(): Promise<HackathonItem[]> {
+    return memoryCache.dedupedFetch('hackathons_list', async () => {
+      const local = getLocal<HackathonItem[]>('ravan_hackathons_list', [initialHackathon]);
       try {
         if (supabase) {
-          const { data, error } = await supabase.from('hackathons').select('*').single();
-          if (!error && data) {
-            setLocal('ravan_hackathon', data);
-            return data as HackathonItem;
+          const { data, error } = await supabase.from('hackathons').select('*').order('created_at', { ascending: false });
+          if (!error && Array.isArray(data) && data.length > 0) {
+            setLocal('ravan_hackathons_list', data);
+            return data as HackathonItem[];
           }
         }
       } catch (err) {
-        if (import.meta.env.DEV) console.warn('Supabase getHackathon fallback:', err);
+        if (import.meta.env.DEV) console.warn('Supabase getHackathons fallback:', err);
       }
       return local;
     });
   },
 
   async saveHackathon(hackathon: HackathonItem): Promise<HackathonItem> {
+    const current = await this.getHackathons();
+    const existingIdx = current.findIndex(h => h.id === hackathon.id);
+    let updated: HackathonItem[];
+    if (existingIdx >= 0) {
+      updated = current.map(h => h.id === hackathon.id ? hackathon : h);
+    } else {
+      updated = [hackathon, ...current];
+    }
+    await this.saveHackathons(updated);
+    return hackathon;
+  },
+
+  async saveHackathons(hackathons: HackathonItem[]): Promise<HackathonItem[]> {
     if (supabase) {
-      const { error } = await supabase.from('hackathons').upsert(hackathon);
+      const { error } = await supabase.from('hackathons').upsert(hackathons);
       if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving hackathon:', error.message);
+        if (import.meta.env.DEV) console.error('Supabase error saving hackathons:', error.message);
         throw formatSupabaseError(error, 'hackathons');
       }
     }
 
-    setLocal('ravan_hackathon', hackathon);
-    memoryCache.set('hackathons', hackathon);
+    setLocal('ravan_hackathons_list', hackathons);
+    if (hackathons.length > 0) {
+      setLocal('ravan_hackathon', hackathons[0]);
+      memoryCache.set('hackathons', hackathons[0]);
+    }
+    memoryCache.set('hackathons_list', hackathons);
 
     try {
-      await this.addAuditLog('UPDATE', 'HACKATHONS', hackathon.id, `Updated hackathon event ${hackathon.title}`);
+      await this.addAuditLog('UPDATE', 'HACKATHONS', undefined, `Updated hackathons (${hackathons.length} events)`);
     } catch {}
 
     notifyDataUpdated('hackathons');
-    return hackathon;
+    return hackathons;
+  },
+
+  async deleteHackathon(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('hackathons').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting hackathon:', error.message);
+        throw formatSupabaseError(error, 'hackathons');
+      }
+    }
+    const current = await this.getHackathons();
+    const updated = current.filter(h => h.id !== id);
+    setLocal('ravan_hackathons_list', updated);
+    memoryCache.set('hackathons_list', updated);
+    if (updated.length > 0) {
+      setLocal('ravan_hackathon', updated[0]);
+      memoryCache.set('hackathons', updated[0]);
+    }
+    notifyDataUpdated('hackathons');
   },
 
   // --- LEARNING PROGRAMS ---
@@ -1703,7 +1763,7 @@ export const dataService = {
       try {
         if (supabase) {
           const { data, error } = await supabase.from('learning_programs').select('*').order('display_order').limit(100);
-          if (!error && Array.isArray(data)) {
+          if (!error && Array.isArray(data) && data.length > 0) {
             setLocal('ravan_learning', data);
             return data as LearningProgram[];
           }
@@ -1735,6 +1795,113 @@ export const dataService = {
     return programs;
   },
 
+  async deleteLearningProgram(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('learning_programs').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting learning program:', error.message);
+        throw formatSupabaseError(error, 'learning_programs');
+      }
+    }
+    const current = await this.getLearningPrograms();
+    const updated = current.filter(p => p.id !== id);
+    setLocal('ravan_learning', updated);
+    memoryCache.set('learning', updated);
+    notifyDataUpdated('learning');
+  },
+
+  // --- AI & ML MODELS ---
+  async getAIMLModels(): Promise<AIMLModel[]> {
+    return memoryCache.dedupedFetch('aiml_models', async () => {
+      const local = getLocal<AIMLModel[]>('ravan_aiml_models', initialAIMLModels);
+      try {
+        if (supabase) {
+          // Check if stored in solutions with category 'ai_model' or dedicated table
+          const { data, error } = await supabase
+            .from('solutions')
+            .select('*')
+            .eq('category', 'ai_model')
+            .order('display_order');
+          if (!error && Array.isArray(data) && data.length > 0) {
+            const mapped: AIMLModel[] = data.map((d: any) => ({
+              id: d.id,
+              name: d.title,
+              provider: d.metrics?.provider || 'Ravan Technologies',
+              model_type: d.architecture_details || 'Private Transformer',
+              description: d.description || '',
+              capabilities: Array.isArray(d.technologies) ? d.technologies : [],
+              use_cases: Array.isArray(d.benefits) ? d.benefits : [],
+              version: d.metrics?.version || 'v1.0',
+              documentation_url: d.cta_url || '',
+              image_url: d.image_url || '',
+              status: d.status || 'published',
+              latency: d.metrics?.latency || '15ms',
+              display_order: d.display_order || 0
+            }));
+            setLocal('ravan_aiml_models', mapped);
+            return mapped;
+          }
+        }
+      } catch (err) {
+        if (import.meta.env.DEV) console.warn('Supabase getAIMLModels fallback:', err);
+      }
+      return local;
+    });
+  },
+
+  async saveAIMLModels(models: AIMLModel[]): Promise<AIMLModel[]> {
+    if (supabase) {
+      try {
+        const solutionsPayload = models.map(m => ({
+          id: m.id.startsWith('sol-') ? m.id : `sol-${m.id}`,
+          slug: `aiml-${m.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+          title: m.name,
+          category: 'ai_model',
+          description: m.description,
+          architecture_details: m.model_type,
+          technologies: m.capabilities,
+          benefits: m.use_cases,
+          image_url: m.image_url || '',
+          cta_url: m.documentation_url || '',
+          display_order: m.display_order,
+          status: m.status,
+          metrics: {
+            provider: m.provider,
+            version: m.version,
+            latency: m.latency
+          }
+        }));
+        await supabase.from('solutions').upsert(solutionsPayload);
+      } catch (err) {
+        if (import.meta.env.DEV) console.warn('Supabase saveAIMLModels note:', err);
+      }
+    }
+
+    setLocal('ravan_aiml_models', models);
+    memoryCache.set('aiml_models', models);
+
+    try {
+      await this.addAuditLog('UPDATE', 'AIML_MODELS', undefined, `Updated AI/ML models (${models.length} specifications)`);
+    } catch {}
+
+    notifyDataUpdated('aiml_models');
+    return models;
+  },
+
+  async deleteAIMLModel(id: string): Promise<void> {
+    if (supabase) {
+      try {
+        const solId = id.startsWith('sol-') ? id : `sol-${id}`;
+        await supabase.from('solutions').delete().eq('id', solId);
+      } catch {}
+    }
+    const current = await this.getAIMLModels();
+    const updated = current.filter(m => m.id !== id);
+    setLocal('ravan_aiml_models', updated);
+    memoryCache.set('aiml_models', updated);
+    notifyDataUpdated('aiml_models');
+  },
+
   // --- ECOSYSTEM ---
   async getEcosystem(): Promise<EcosystemItem[]> {
     return memoryCache.dedupedFetch('ecosystem', async () => {
@@ -1742,7 +1909,7 @@ export const dataService = {
       try {
         if (supabase) {
           const { data, error } = await supabase.from('ecosystem').select('*');
-          if (!error && Array.isArray(data)) {
+          if (!error && Array.isArray(data) && data.length > 0) {
             setLocal('ravan_ecosystem', data);
             return data as EcosystemItem[];
           }
@@ -1774,6 +1941,21 @@ export const dataService = {
     return items;
   },
 
+  async deleteEcosystemItem(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('ecosystem').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting ecosystem item:', error.message);
+        throw formatSupabaseError(error, 'ecosystem');
+      }
+    }
+    const current = await this.getEcosystem();
+    const updated = current.filter(e => e.id !== id);
+    setLocal('ravan_ecosystem', updated);
+    memoryCache.set('ecosystem', updated);
+    notifyDataUpdated('ecosystem');
+  },
+
   // --- MEDIA ---
   async getMedia(): Promise<MediaItem[]> {
     return memoryCache.dedupedFetch('media', async () => {
@@ -1781,7 +1963,7 @@ export const dataService = {
       try {
         if (supabase) {
           const { data, error } = await supabase.from('media').select('*').order('created_at', { ascending: false }).limit(100);
-          if (!error && Array.isArray(data)) {
+          if (!error && Array.isArray(data) && data.length > 0) {
             setLocal('ravan_media', data);
             return data as MediaItem[];
           }
@@ -1806,6 +1988,30 @@ export const dataService = {
     memoryCache.set('media', items);
     notifyDataUpdated('media');
     return items;
+  },
+
+  async deleteMedia(id: string): Promise<void> {
+    const current = await this.getMedia();
+    const itemToDelete = current.find(m => m.id === id);
+
+    if (supabase) {
+      const { error } = await supabase.from('media').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting media:', error.message);
+        throw formatSupabaseError(error, 'media');
+      }
+      // Safe storage removal if storage_path exists and is in site-assets
+      if (itemToDelete?.storage_path) {
+        try {
+          await supabase.storage.from('site-assets').remove([itemToDelete.storage_path]);
+        } catch {}
+      }
+    }
+
+    const updated = current.filter(m => m.id !== id);
+    setLocal('ravan_media', updated);
+    memoryCache.set('media', updated);
+    notifyDataUpdated('media');
   },
 
   // --- CONTACT ENQUIRIES & DIRECTIVES AUTOMATION ---
@@ -2283,6 +2489,21 @@ export const dataService = {
     return posts;
   },
 
+  async deleteBlogPost(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting blog post:', error.message);
+        throw formatSupabaseError(error, 'blog_posts');
+      }
+    }
+    const current = await this.getBlogPosts();
+    const updated = current.filter(p => p.id !== id);
+    setLocal('ravan_blog_posts', updated);
+    memoryCache.set('blog', updated);
+    notifyDataUpdated('blog');
+  },
+
   // --- EVENTS ---
   async getEvents(): Promise<EventItem[]> {
     return memoryCache.dedupedFetch('events', async () => {
@@ -2290,7 +2511,7 @@ export const dataService = {
       try {
         if (supabase) {
           const { data, error } = await supabase.from('events').select('*').order('event_date', { ascending: true }).limit(50);
-          if (!error && Array.isArray(data)) {
+          if (!error && Array.isArray(data) && data.length > 0) {
             setLocal('ravan_events', data);
             return data as EventItem[];
           }
@@ -2322,6 +2543,21 @@ export const dataService = {
     return events;
   },
 
+  async deleteEvent(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('events').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting event:', error.message);
+        throw formatSupabaseError(error, 'events');
+      }
+    }
+    const current = await this.getEvents();
+    const updated = current.filter(e => e.id !== id);
+    setLocal('ravan_events', updated);
+    memoryCache.set('events', updated);
+    notifyDataUpdated('events');
+  },
+
   // --- TESTIMONIALS ---
   async getTestimonials(): Promise<TestimonialItem[]> {
     return memoryCache.dedupedFetch('testimonials', async () => {
@@ -2329,7 +2565,7 @@ export const dataService = {
       try {
         if (supabase) {
           const { data, error } = await supabase.from('testimonials').select('*').order('display_order').limit(100);
-          if (!error && Array.isArray(data)) {
+          if (!error && Array.isArray(data) && data.length > 0) {
             setLocal('ravan_testimonials', data);
             return data as TestimonialItem[];
           }
@@ -2361,6 +2597,21 @@ export const dataService = {
     return items;
   },
 
+  async deleteTestimonial(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('testimonials').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting testimonial:', error.message);
+        throw formatSupabaseError(error, 'testimonials');
+      }
+    }
+    const current = await this.getTestimonials();
+    const updated = current.filter(t => t.id !== id);
+    setLocal('ravan_testimonials', updated);
+    memoryCache.set('testimonials', updated);
+    notifyDataUpdated('testimonials');
+  },
+
   // --- PARTNERS & CLIENTS ---
   async getPartners(): Promise<PartnerItem[]> {
     return memoryCache.dedupedFetch('partners', async () => {
@@ -2368,7 +2619,7 @@ export const dataService = {
       try {
         if (supabase) {
           const { data, error } = await supabase.from('partners').select('*').order('display_order');
-          if (!error && Array.isArray(data)) {
+          if (!error && Array.isArray(data) && data.length > 0) {
             setLocal('ravan_partners', data);
             return data as PartnerItem[];
           }
@@ -2384,8 +2635,21 @@ export const dataService = {
     if (supabase) {
       const { error } = await supabase.from('partners').upsert(items);
       if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving partners:', error.message);
-        throw formatSupabaseError(error, 'partners');
+        // Fallback with core columns if status/description are omitted in DB schema
+        try {
+          const coreItems = items.map(p => ({
+            id: p.id,
+            name: p.name,
+            logo_url: p.logo_url,
+            website_url: p.website_url || '',
+            category: p.category,
+            display_order: p.display_order
+          }));
+          await supabase.from('partners').upsert(coreItems);
+        } catch (coreErr) {
+          if (import.meta.env.DEV) console.error('Supabase error saving partners:', error.message);
+          throw formatSupabaseError(error, 'partners');
+        }
       }
     }
 
@@ -2395,13 +2659,28 @@ export const dataService = {
     return items;
   },
 
+  async deletePartner(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('partners').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting partner:', error.message);
+        throw formatSupabaseError(error, 'partners');
+      }
+    }
+    const current = await this.getPartners();
+    const updated = current.filter(p => p.id !== id);
+    setLocal('ravan_partners', updated);
+    memoryCache.set('partners', updated);
+    notifyDataUpdated('partners');
+  },
+
   async getClients(): Promise<ClientItem[]> {
     return memoryCache.dedupedFetch('clients', async () => {
       const local = getLocal<ClientItem[]>('ravan_clients', initialClients);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('clients').select('*').order('display_order');
-          if (!error && Array.isArray(data)) {
+          if (!error && Array.isArray(data) && data.length > 0) {
             setLocal('ravan_clients', data);
             return data as ClientItem[];
           }
@@ -2417,8 +2696,20 @@ export const dataService = {
     if (supabase) {
       const { error } = await supabase.from('clients').upsert(items);
       if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving clients:', error.message);
-        throw formatSupabaseError(error, 'clients');
+        // Fallback with core columns if status/description are omitted in DB schema
+        try {
+          const coreItems = items.map(c => ({
+            id: c.id,
+            name: c.name,
+            logo_url: c.logo_url,
+            industry: c.industry,
+            display_order: c.display_order
+          }));
+          await supabase.from('clients').upsert(coreItems);
+        } catch (coreErr) {
+          if (import.meta.env.DEV) console.error('Supabase error saving clients:', error.message);
+          throw formatSupabaseError(error, 'clients');
+        }
       }
     }
 
@@ -2426,6 +2717,21 @@ export const dataService = {
     memoryCache.set('clients', items);
     notifyDataUpdated('clients');
     return items;
+  },
+
+  async deleteClient(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('clients').delete().eq('id', id);
+      if (error) {
+        if (import.meta.env.DEV) console.error('Supabase error deleting client:', error.message);
+        throw formatSupabaseError(error, 'clients');
+      }
+    }
+    const current = await this.getClients();
+    const updated = current.filter(c => c.id !== id);
+    setLocal('ravan_clients', updated);
+    memoryCache.set('clients', updated);
+    notifyDataUpdated('clients');
   },
 
   // --- ROLES & PERMISSIONS ---
@@ -2607,48 +2913,6 @@ export const dataService = {
     notifyDataUpdated('projects');
   },
 
-  async deleteLearningProgram(id: string): Promise<void> {
-    if (supabase) {
-      const { error } = await supabase.from('learning_programs').delete().eq('id', id);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error deleting learning program:', error.message);
-        throw formatSupabaseError(error, 'learning_programs');
-      }
-    }
-
-    const current = await this.getLearningPrograms();
-    const updated = current.filter(l => l.id !== id);
-    setLocal('ravan_learning', updated);
-    memoryCache.set('learning', updated);
-
-    try {
-      await this.addAuditLog('DELETE', 'LEARNING', id, 'Deleted learning track');
-    } catch {}
-
-    notifyDataUpdated('learning');
-  },
-
-  async deleteMedia(id: string): Promise<void> {
-    if (supabase) {
-      const { error } = await supabase.from('media').delete().eq('id', id);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error deleting media:', error.message);
-        throw formatSupabaseError(error, 'media');
-      }
-    }
-
-    const current = await this.getMedia();
-    const updated = current.filter(m => m.id !== id);
-    setLocal('ravan_media', updated);
-    memoryCache.set('media', updated);
-
-    try {
-      await this.addAuditLog('DELETE', 'MEDIA', id, 'Deleted media asset record');
-    } catch {}
-
-    notifyDataUpdated('media');
-  },
-
   async deleteGalleryAlbum(id: string): Promise<void> {
     if (supabase) {
       const { error } = await supabase.from('gallery_albums').delete().eq('id', id);
@@ -2670,100 +2934,6 @@ export const dataService = {
     notifyDataUpdated('gallery');
   },
 
-  async deleteBlogPost(id: string): Promise<void> {
-    if (supabase) {
-      const { error } = await supabase.from('blog_posts').delete().eq('id', id);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error deleting blog post:', error.message);
-        throw formatSupabaseError(error, 'blog_posts');
-      }
-    }
-
-    const current = await this.getBlogPosts();
-    const updated = current.filter(b => b.id !== id);
-    setLocal('ravan_blog_posts', updated);
-    memoryCache.set('blog', updated);
-
-    try {
-      await this.addAuditLog('DELETE', 'BLOG', id, 'Deleted engineering whitepaper');
-    } catch {}
-
-    notifyDataUpdated('blog');
-  },
-
-  async deleteEvent(id: string): Promise<void> {
-    if (supabase) {
-      const { error } = await supabase.from('events').delete().eq('id', id);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error deleting event:', error.message);
-        throw formatSupabaseError(error, 'events');
-      }
-    }
-
-    const current = await this.getEvents();
-    const updated = current.filter(e => e.id !== id);
-    setLocal('ravan_events', updated);
-    memoryCache.set('events', updated);
-
-    try {
-      await this.addAuditLog('DELETE', 'EVENTS', id, 'Deleted event schedule');
-    } catch {}
-
-    notifyDataUpdated('events');
-  },
-
-  async deleteTestimonial(id: string): Promise<void> {
-    if (supabase) {
-      const { error } = await supabase.from('testimonials').delete().eq('id', id);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error deleting testimonial:', error.message);
-        throw formatSupabaseError(error, 'testimonials');
-      }
-    }
-
-    const current = await this.getTestimonials();
-    const updated = current.filter(t => t.id !== id);
-    setLocal('ravan_testimonials', updated);
-    memoryCache.set('testimonials', updated);
-
-    try {
-      await this.addAuditLog('DELETE', 'TESTIMONIALS', id, 'Deleted client testimonial');
-    } catch {}
-
-    notifyDataUpdated('testimonials');
-  },
-
-  async deletePartner(id: string): Promise<void> {
-    if (supabase) {
-      const { error } = await supabase.from('partners').delete().eq('id', id);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error deleting partner:', error.message);
-        throw formatSupabaseError(error, 'partners');
-      }
-    }
-
-    const current = await this.getPartners();
-    const updated = current.filter(p => p.id !== id);
-    setLocal('ravan_partners', updated);
-    memoryCache.set('partners', updated);
-    notifyDataUpdated('partners');
-  },
-
-  async deleteClient(id: string): Promise<void> {
-    if (supabase) {
-      const { error } = await supabase.from('clients').delete().eq('id', id);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error deleting client:', error.message);
-        throw formatSupabaseError(error, 'clients');
-      }
-    }
-
-    const current = await this.getClients();
-    const updated = current.filter(c => c.id !== id);
-    setLocal('ravan_clients', updated);
-    memoryCache.set('clients', updated);
-    notifyDataUpdated('clients');
-  },
 
   async deleteEnquiry(id: string): Promise<void> {
     if (supabase) {

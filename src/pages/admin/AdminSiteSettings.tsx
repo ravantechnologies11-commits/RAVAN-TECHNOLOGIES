@@ -107,7 +107,7 @@ DROP POLICY IF EXISTS "Only admins can modify site settings" ON public.site_sett
 CREATE POLICY "Only admins can modify site settings" ON public.site_settings FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 INSERT INTO public.site_settings (id, site_name, tagline, description, logo_url, contact_email, office_address)
-VALUES ('primary_settings', 'Ravan Technologies', 'Building Technology. Solving Real Problems.', 'Architecting sovereign software systems, enterprise intelligence, and physical computing infrastructure for institutional scale.', '/images/ravan-logo.png', 'contact@ravantechnologies.com', 'Ravan Tech Park, Outer Ring Road, Bengaluru')
+VALUES ('primary_settings', 'Ravan Technologies', 'Building Technology. Solving Real Problems.', 'Architecting sovereign software systems, enterprise intelligence, and physical computing infrastructure for institutional scale.', '/images/ravan-logo.png', 'contact@ravantechnologies.com', 'Ravan Technologies Headquarters, Thiruvannamalai, Tamil Nadu, India')
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.seo_metadata (
@@ -1620,14 +1620,90 @@ export const AdminSiteSettings: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Official Office / Campus Address</label>
-            <input
-              type="text"
-              value={site.office_address || ''}
-              onChange={e => setSite({ ...site, office_address: e.target.value })}
-              className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:border-secondary focus:outline-none"
-            />
+          {/* Authoritative Single Source of Truth for Company Location / HQ */}
+          <div className="p-4 bg-[#07111e] border border-secondary/30 rounded-lg space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-secondary-fixed flex items-center gap-2">
+                <span>AUTHORITATIVE COMPANY LOCATION / HEADQUARTERS</span>
+              </span>
+              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
+                Single Source of Truth
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              The values set here automatically update the website Footer, Contact Page, About Page, Organization Schema, and SEO structured data. No hardcoded fallback will override this.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-300 mb-1">
+                  HQ Display Location / Text <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={site.hq_location || ''}
+                  onChange={e => setSite({ ...site, hq_location: e.target.value })}
+                  placeholder="e.g. Thiruvannamalai, Tamil Nadu, India"
+                  className="w-full px-3 py-2 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:border-secondary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-300 mb-1">
+                  HQ Label / Badge
+                </label>
+                <input
+                  type="text"
+                  value={site.hq_label || ''}
+                  onChange={e => setSite({ ...site, hq_label: e.target.value })}
+                  placeholder="e.g. Global Headquarters"
+                  className="w-full px-3 py-2 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:border-secondary focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">City</label>
+                <input
+                  type="text"
+                  value={site.hq_city || ''}
+                  onChange={e => setSite({ ...site, hq_city: e.target.value })}
+                  placeholder="Thiruvannamalai"
+                  className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:border-secondary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">State / Province</label>
+                <input
+                  type="text"
+                  value={site.hq_state || ''}
+                  onChange={e => setSite({ ...site, hq_state: e.target.value })}
+                  placeholder="Tamil Nadu"
+                  className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:border-secondary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Country</label>
+                <input
+                  type="text"
+                  value={site.hq_country || ''}
+                  onChange={e => setSite({ ...site, hq_country: e.target.value })}
+                  placeholder="India"
+                  className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:border-secondary focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Full Postal / Office Address</label>
+              <input
+                type="text"
+                value={site.office_address || ''}
+                onChange={e => setSite({ ...site, office_address: e.target.value })}
+                placeholder="Ravan Technologies Headquarters, Thiruvannamalai, Tamil Nadu, India"
+                className="w-full px-3 py-2 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:border-secondary focus:outline-none"
+              />
+            </div>
           </div>
         </div>
 

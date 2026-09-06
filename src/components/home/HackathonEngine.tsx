@@ -103,11 +103,11 @@ export const HackathonEngine: React.FC<HackathonEngineProps> = ({ hackathon, isL
 
               <div className="flex items-center justify-between text-xs font-bold tracking-widest text-primary uppercase">
                 <span className="px-3 py-1.5 bg-surface rounded">LEARN</span>
-                <span className="material-symbols-outlined text-[16px] text-secondary">arrow_right_alt</span>
+                <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
                 <span className="px-3 py-1.5 bg-surface rounded">BUILD</span>
-                <span className="material-symbols-outlined text-[16px] text-secondary">arrow_right_alt</span>
+                <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
                 <span className="px-3 py-1.5 bg-surface rounded">COMPETE</span>
-                <span className="material-symbols-outlined text-[16px] text-secondary">arrow_right_alt</span>
+                <ArrowRight className="w-4 h-4 text-secondary shrink-0" />
                 <span className="px-3 py-1.5 bg-secondary-container text-on-secondary-container rounded">SOLVE</span>
               </div>
             </div>

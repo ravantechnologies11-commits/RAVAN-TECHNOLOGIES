@@ -815,7 +815,7 @@ export const AdminSEO: React.FC = () => {
                   value={site.office_address || ''}
                   onChange={e => setSite({ ...site, office_address: e.target.value })}
                   className="w-full px-3 py-1.5 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:border-secondary outline-none"
-                  placeholder="Ravan Tech Park, Outer Ring Road, Bengaluru, Karnataka 560103"
+                  placeholder="Ravan Technologies HQ, Thiruvannamalai, Tamil Nadu, India"
                 />
               </div>
 

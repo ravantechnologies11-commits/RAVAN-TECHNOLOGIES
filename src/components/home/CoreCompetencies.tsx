@@ -1,6 +1,20 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight } from 'lucide-react';
+import { 
+  ArrowUpRight, 
+  Cpu, 
+  Layers, 
+  Terminal, 
+  Brain, 
+  Code2, 
+  Network, 
+  Sparkles, 
+  ShieldCheck, 
+  Zap,
+  Cloud,
+  Database,
+  Globe
+} from 'lucide-react';
 import { ServiceItem } from '../../types';
 
 interface CoreCompetenciesProps {
@@ -44,11 +58,25 @@ export const CoreCompetencies: React.FC<CoreCompetenciesProps> = ({ services, is
 
   const topServices = services.slice(0, 3);
 
-  const getIcon = (iconName?: string, idx?: number) => {
-    if (iconName) return iconName;
-    if (idx === 0) return 'integration_instructions';
-    if (idx === 1) return 'psychology';
-    return 'schema';
+  const renderServiceIcon = (iconName?: string, idx: number = 0, isDark: boolean = false) => {
+    const className = `w-10 h-10 mb-6 block ${isDark ? 'text-secondary-fixed' : 'text-primary'}`;
+    const name = (iconName || '').toLowerCase().trim();
+    if (name === 'cpu' || name === 'chip') return <Cpu className={className} />;
+    if (name === 'layers' || name === 'stack') return <Layers className={className} />;
+    if (name === 'terminal' || name === 'cli') return <Terminal className={className} />;
+    if (name === 'brain' || name === 'psychology' || name === 'ai') return <Brain className={className} />;
+    if (name === 'code' || name === 'code2' || name === 'integration_instructions') return <Code2 className={className} />;
+    if (name === 'network' || name === 'mesh' || name === 'schema' || name === 'hub') return <Network className={className} />;
+    if (name === 'sparkles' || name === 'magic') return <Sparkles className={className} />;
+    if (name === 'shield' || name === 'shieldcheck' || name === 'security') return <ShieldCheck className={className} />;
+    if (name === 'zap' || name === 'performance') return <Zap className={className} />;
+    if (name === 'cloud') return <Cloud className={className} />;
+    if (name === 'database') return <Database className={className} />;
+    if (name === 'globe') return <Globe className={className} />;
+
+    if (idx === 0) return <Code2 className={className} />;
+    if (idx === 1) return <Brain className={className} />;
+    return <Layers className={className} />;
   };
 
   return (
@@ -93,9 +121,7 @@ export const CoreCompetencies: React.FC<CoreCompetenciesProps> = ({ services, is
                     AI
                   </div>
                   <div className="relative z-10">
-                    <span className="material-symbols-outlined text-[40px] text-secondary-fixed mb-6 block">
-                      {getIcon(service.icon, idx)}
-                    </span>
+                    {renderServiceIcon(service.icon, idx, true)}
                     <div className="text-[11px] font-bold text-secondary-fixed tracking-widest uppercase mb-2">
                       {service.code || `0${idx + 1} // SOVEREIGN ENGINE`}
                     </div>
@@ -126,9 +152,7 @@ export const CoreCompetencies: React.FC<CoreCompetenciesProps> = ({ services, is
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-surface-variant rounded-bl-full -z-10 group-hover:scale-150 transition-transform duration-500 opacity-40" />
                 <div>
-                  <span className="material-symbols-outlined text-[40px] text-primary mb-6 block">
-                    {getIcon(service.icon, idx)}
-                  </span>
+                  {renderServiceIcon(service.icon, idx, false)}
                   <div className="text-[11px] font-bold text-on-surface-variant tracking-widest uppercase mb-2">
                     {service.code || `0${idx + 1} // CORE CAPABILITY`}
                   </div>

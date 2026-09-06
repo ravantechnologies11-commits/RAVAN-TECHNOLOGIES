@@ -54,11 +54,11 @@ export function buildOrganizationSchema(site?: SiteSettings | null, seo?: SEOSet
     ...(activeSite.contact_phone ? { telephone: activeSite.contact_phone } : {}),
     address: {
       '@type': 'PostalAddress',
-      streetAddress: activeSite.office_address || 'Ravan Tech Park, Outer Ring Road',
-      addressLocality: 'Bengaluru',
-      addressRegion: 'Karnataka',
-      postalCode: '560103',
-      addressCountry: 'IN'
+      streetAddress: activeSite.office_address || activeSite.hq_location || 'Ravan Technologies HQ',
+      addressLocality: activeSite.hq_city || 'Thiruvannamalai',
+      addressRegion: activeSite.hq_state || 'Tamil Nadu',
+      postalCode: '606601',
+      addressCountry: activeSite.hq_country || 'IN'
     },
     sameAs: sameAsLinks,
     founder: {

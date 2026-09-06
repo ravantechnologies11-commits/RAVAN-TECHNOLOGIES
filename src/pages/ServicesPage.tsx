@@ -6,7 +6,42 @@ import { WorkWithUsModal } from '../components/common/WorkWithUsModal';
 import { dataService } from '../lib/dataService';
 import { ServiceItem } from '../types';
 import { initialServices } from '../data/initialData';
-import { ArrowRight, CheckCircle2, ArrowUpRight } from 'lucide-react';
+import { 
+  ArrowRight, 
+  CheckCircle2, 
+  ArrowUpRight, 
+  Cpu, 
+  Layers, 
+  ShieldCheck, 
+  Activity, 
+  Terminal, 
+  Zap, 
+  Cloud, 
+  Database, 
+  Network, 
+  Code, 
+  Sparkles 
+} from 'lucide-react';
+
+const renderFeatureIcon = (iconName?: string) => {
+  const name = (iconName || '').toLowerCase().trim();
+  const cls = "w-5 h-5 text-primary shrink-0 mt-0.5";
+  switch (name) {
+    case 'cpu': return <Cpu className={cls} />;
+    case 'layers': return <Layers className={cls} />;
+    case 'shieldcheck':
+    case 'shield': return <ShieldCheck className={cls} />;
+    case 'activity': return <Activity className={cls} />;
+    case 'terminal': return <Terminal className={cls} />;
+    case 'zap': return <Zap className={cls} />;
+    case 'cloud': return <Cloud className={cls} />;
+    case 'database': return <Database className={cls} />;
+    case 'network': return <Network className={cls} />;
+    case 'code': return <Code className={cls} />;
+    case 'sparkles': return <Sparkles className={cls} />;
+    default: return <CheckCircle2 className={cls} />;
+  }
+};
 
 export const ServicesPage: React.FC = () => {
   const [services, setServices] = useState<ServiceItem[] | null>(null);
@@ -121,9 +156,7 @@ export const ServicesPage: React.FC = () => {
                 <div className="flex flex-col gap-3 mb-6">
                   {srv.features?.map((f, fi) => (
                     <div key={fi} className="flex items-start gap-3">
-                      <span className="material-symbols-outlined text-primary text-[20px] mt-0.5">
-                        {f.icon || 'check_circle'}
-                      </span>
+                      {renderFeatureIcon(f.icon)}
                       <div>
                         <h4 className="text-xs font-bold uppercase tracking-wider text-primary">
                           {f.title}

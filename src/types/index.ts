@@ -229,18 +229,21 @@ export interface ProjectItem {
 
 export interface HackathonTrack {
   id: string;
-  track_number: string;
+  track_number?: string;
   title: string;
   description: string;
-  image_url: string;
-  teams_registered: number;
+  image_url?: string;
+  teams_registered?: number;
   badge_color?: string;
 }
 
 export interface ProblemStatement {
+  id?: string;
   title: string;
-  domain: string;
+  domain?: string;
+  category?: string;
   description: string;
+  complexity?: 'Easy' | 'Medium' | 'Hard' | string;
 }
 
 export interface WinningSolution {
@@ -254,14 +257,25 @@ export interface HackathonItem {
   id: string;
   title: string;
   edition: string;
+  subtitle?: string;
   event_date: string;
-  status: 'upcoming' | 'live' | 'completed';
+  time?: string;
+  location?: string;
+  registration_url?: string;
+  status: 'upcoming' | 'live' | 'completed' | 'draft';
   focus_statement: string;
   description: string;
   image_url: string;
+  banner_url?: string;
+  additional_images?: string[];
   solutions_deployed_count: string;
   tracks: HackathonTrack[];
   problem_statements: ProblemStatement[];
+  rules?: string[];
+  prizes?: string[];
+  eligibility?: string;
+  contact_info?: string;
+  display_order?: number;
   winning_solutions: WinningSolution[];
 }
 
@@ -282,11 +296,33 @@ export interface LearningProgram {
   description: string;
   enrolled_count: string;
   image_url: string;
+  video_url?: string;
+  external_url?: string;
+  instructor_info?: string;
+  category?: string;
   methodology_phase: string;
   curriculum: CurriculumModule[];
   prerequisites: string[];
   display_order: number;
   status: 'draft' | 'published' | 'archived';
+}
+
+export interface AIMLModel {
+  id: string;
+  name: string;
+  provider: string;
+  model_type: string;
+  description: string;
+  capabilities: string[];
+  use_cases: string[];
+  version: string;
+  documentation_url?: string;
+  image_url?: string;
+  status: 'published' | 'draft';
+  latency?: string;
+  display_order: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface EcosystemMetric {
@@ -304,14 +340,25 @@ export interface EcosystemFeature {
 export interface EcosystemItem {
   id: string;
   name: string;
-  type: 'hub' | 'studio';
+  type: 'hub' | 'studio' | string;
   tagline: string;
   description: string;
+  overview?: string;
+  facilities?: string[];
+  services?: string[];
+  location?: string;
+  address?: string;
+  contact_info?: string;
+  website_url?: string;
   image_url: string;
+  gallery?: string[];
+  videos?: string[];
   metrics: EcosystemMetric;
   features: EcosystemFeature[];
   specifications: string[];
   status_badge: string;
+  status?: 'published' | 'draft';
+  display_order?: number;
 }
 
 export interface FilmProject {
@@ -409,6 +456,7 @@ export interface PartnerItem {
   name: string;
   logo_url: string;
   website_url?: string;
+  description?: string;
   category: 'technology' | 'academic' | 'enterprise';
   display_order: number;
   status: 'published' | 'draft';
@@ -419,6 +467,9 @@ export interface ClientItem {
   name: string;
   logo_url: string;
   industry: string;
+  description?: string;
+  website_url?: string;
+  project_reference?: string;
   display_order: number;
   status: 'published' | 'draft';
 }
@@ -476,6 +527,11 @@ export interface SiteSettings {
   whatsapp_number?: string;
   direct_whatsapp_number?: string;
   office_address?: string;
+  hq_location?: string;
+  hq_label?: string;
+  hq_city?: string;
+  hq_state?: string;
+  hq_country?: string;
   social_links: SocialLinks;
   footer_text?: string;
   copyright_text?: string;

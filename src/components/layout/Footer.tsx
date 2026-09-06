@@ -131,7 +131,7 @@ export const Footer: React.FC = () => {
             {site?.description || (loading ? 'Loading sovereign architecture specifications...' : 'Architecting sovereign software systems, enterprise intelligence, and physical computing infrastructure for institutional scale.')}
           </p>
           <div className="text-[11px] text-on-surface-variant space-y-1">
-            <p><strong>HQ:</strong> {site?.office_address || (loading ? 'Loading...' : 'Ravan Tech Park, Outer Ring Road, Bengaluru')}</p>
+            <p><strong>HQ:</strong> {site?.hq_location || site?.office_address || (loading ? 'Loading...' : 'Thiruvannamalai, Tamil Nadu, India')}</p>
             <p><strong>Inquiries:</strong> {site?.contact_email || (loading ? 'Loading...' : 'contact@ravantechnologies.com')}</p>
           </div>
 
@@ -199,7 +199,7 @@ export const Footer: React.FC = () => {
         <div className="flex items-center gap-6">
           <span>Sovereign Intelligence Architecture</span>
           <span>•</span>
-          <span>Bengaluru, India</span>
+          <span>{site?.hq_location || site?.office_address || 'Thiruvannamalai, Tamil Nadu, India'}</span>
         </div>
       </div>
     </footer>

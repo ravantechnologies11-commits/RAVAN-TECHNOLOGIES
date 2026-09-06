@@ -19,7 +19,8 @@ import {
   TestimonialItem,
   PartnerItem,
   ClientItem,
-  RoleItem
+  RoleItem,
+  AIMLModel
 } from '../types';
 
 export const initialFounder: Founder = {
@@ -821,8 +822,12 @@ export const initialSiteSettings: SiteSettings = {
   logo_url: 'https://iecesxahkbkkafzmzwcd.supabase.co/storage/v1/object/public/site-assets/branding/ravan-logo.png?v=1788066287989',
   contact_email: 'ravantechnology001@gmail.com',
   contact_phone: '',
-  whatsapp_number: '',
-  office_address: 'Ravan Tech Park, Outer Ring Road, Bengaluru',
+  office_address: 'Ravan Technologies Headquarters, Thiruvannamalai, Tamil Nadu, India',
+  hq_location: 'Thiruvannamalai, Tamil Nadu, India',
+  hq_label: 'Global Headquarters',
+  hq_city: 'Thiruvannamalai',
+  hq_state: 'Tamil Nadu',
+  hq_country: 'India',
   social_links: {
     instagram: 'https://www.instagram.com/ravan__tech?igsi=ZGEyYWU1ODljd3p0'
   },
@@ -938,7 +943,7 @@ export const initialEvents: EventItem[] = [
     slug: 'sovereign-intelligence-summit-2026',
     event_type: 'summit',
     event_date: 'NOVEMBER 18, 2026',
-    location: 'Ravan Tech Park Amphitheater, Bengaluru & Global Livestream',
+    location: 'Ravan Tech Park Amphitheater, Thiruvannamalai & Global Livestream',
     description: 'An executive symposium gathering chief architects, distributed systems engineers, and AI researchers to discuss private model governance.',
     image_url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
     registration_link: '/contact',
@@ -974,4 +979,33 @@ export const initialRoles: RoleItem[] = [
   { id: 'role-3', name: 'Editor', description: 'Draft and update articles, case studies, and services.', permissions: ['content.edit', 'content.create'] },
   { id: 'role-4', name: 'Media Manager', description: 'Upload and organize media library assets and gallery albums.', permissions: ['media.*', 'gallery.*'] },
   { id: 'role-5', name: 'Viewer', description: 'Read-only access to analytics and audit reports.', permissions: ['read.only'] }
+];
+
+export const initialAIMLModels: AIMLModel[] = [
+  {
+    id: 'aiml-001',
+    name: 'Ravan-LLM-70B-Sovereign',
+    provider: 'Ravan Technologies',
+    model_type: 'Private Fine-Tuned Transformer',
+    description: 'On-premise enterprise language model with air-gapped confidential compute and domain fine-tuning.',
+    capabilities: ['Confidential Inference', 'Zero Data Retention', 'C++ Runtime Kernel', 'Low-Latency Token Streaming'],
+    use_cases: ['Enterprise Knowledge Bases', 'Sovereign Legal/Financial Analysis', 'Mission-Critical Directives'],
+    version: 'v3.2-production',
+    latency: '12ms / token',
+    status: 'published',
+    display_order: 1
+  },
+  {
+    id: 'aiml-002',
+    name: 'Neural-Graph-Logistics-v3',
+    provider: 'Ravan Technologies',
+    model_type: 'Reinforcement Learning Graph',
+    description: 'High-concurrency graph optimization network recalculating multi-modal logistics routes in sub-millisecond cycles.',
+    capabilities: ['Dynamic Re-routing', 'Sub-millisecond Convergence', 'Zero Allocation Rust Engine'],
+    use_cases: ['Supply Chain Routing', 'Distributed Power Grid Balancing', 'Physical Fleet Logistics'],
+    version: 'v2.8-stable',
+    latency: '450us recalculation',
+    status: 'published',
+    display_order: 2
+  }
 ];
