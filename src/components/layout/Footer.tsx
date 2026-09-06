@@ -25,19 +25,16 @@ interface CompanySocialItem {
 }
 
 export const Footer: React.FC = () => {
-  const [site, setSite] = useState<SiteSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [site, setSite] = useState<SiteSettings>(() => dataService.getSiteSettingsSync());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getSiteSettings().then(st => {
       if (isMounted && st) {
         setSite(st);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = (e: any) => {
       if (isMounted && e.detail) setSite(e.detail);

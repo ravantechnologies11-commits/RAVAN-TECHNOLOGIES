@@ -9,19 +9,16 @@ import { Building2, Clapperboard, CheckCircle2, ArrowRight, ShieldCheck } from '
 import { Link } from 'react-router-dom';
 
 export const EcosystemPage: React.FC = () => {
-  const [items, setItems] = useState<EcosystemItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<EcosystemItem[]>(() => dataService.getEcosystemSync());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getEcosystem().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setItems(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getEcosystem().then((data) => {

@@ -10,8 +10,11 @@ import { Link } from 'react-router-dom';
 
 export const TeamPage: React.FC = () => {
   const { founders, loading: founderLoading } = useFounder();
-  const [leadership, setLeadership] = useState<LeadershipMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [leadership, setLeadership] = useState<LeadershipMember[]>(() => {
+    const all = dataService.getLeadershipSync();
+    return all.filter(m => m.status === 'published').sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+  });
+  const [loading, setLoading] = useState(false);
 
   const publishedFounders = (founders || []).filter(f => f.status === 'published');
   const primaryFounder = publishedFounders[0] || null;
@@ -25,9 +28,7 @@ export const TeamPage: React.FC = () => {
         .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       setLeadership(published);
     } catch {
-      setLeadership([]);
-    } finally {
-      setLoading(false);
+      // Clean fallback
     }
   };
 

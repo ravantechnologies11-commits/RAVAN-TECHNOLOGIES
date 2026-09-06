@@ -36,8 +36,14 @@ type ProfileData =
 
 export const TeamMemberProfilePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<ProfileData | null>(() => {
+    if (!slug) return null;
+    return dataService.getProfileBySlugSync(slug.toLowerCase().trim());
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (!slug) return false;
+    return !dataService.getProfileBySlugSync(slug.toLowerCase().trim());
+  });
   const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
 
   useEffect(() => {
@@ -52,7 +58,6 @@ export const TeamMemberProfilePage: React.FC = () => {
         return;
       }
 
-      setLoading(true);
       const cleanSlug = slug.toLowerCase().trim();
 
       try {

@@ -9,19 +9,16 @@ import { Calendar, Trophy, Users, ArrowRight, Code2, Award } from 'lucide-react'
 import { Link } from 'react-router-dom';
 
 export const HackathonsPage: React.FC = () => {
-  const [hackathon, setHackathon] = useState<HackathonItem | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [hackathon, setHackathon] = useState<HackathonItem | null>(() => dataService.getHackathonSync());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getHackathon().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setHackathon(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getHackathon().then((data) => {

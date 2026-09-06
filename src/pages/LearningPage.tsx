@@ -8,19 +8,16 @@ import { GraduationCap, BookOpen, Terminal, CheckCircle2, ArrowRight } from 'luc
 import { Link } from 'react-router-dom';
 
 export const LearningPage: React.FC = () => {
-  const [programs, setPrograms] = useState<LearningProgram[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [programs, setPrograms] = useState<LearningProgram[]>(() => dataService.getLearningProgramsSync());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getLearningPrograms().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setPrograms(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getLearningPrograms().then((data) => {

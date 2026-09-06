@@ -8,19 +8,16 @@ import { initialBlogPosts } from '../data/initialData';
 import { ArrowRight, Clock, Newspaper } from 'lucide-react';
 
 export const BlogPage: React.FC = () => {
-  const [posts, setPosts] = useState<BlogPost[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState<BlogPost[]>(() => dataService.getBlogPostsSync());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getBlogPosts().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setPosts(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getBlogPosts().then((data) => {

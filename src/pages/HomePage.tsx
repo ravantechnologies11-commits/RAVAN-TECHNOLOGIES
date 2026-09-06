@@ -16,13 +16,13 @@ import { ServiceItem, HackathonItem, ProjectItem, EcosystemItem, SiteSettings } 
 
 export const HomePage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [services, setServices] = useState<ServiceItem[] | null>(null);
-  const [hackathon, setHackathon] = useState<HackathonItem | null>(null);
-  const [projects, setProjects] = useState<ProjectItem[] | null>(null);
-  const [ecosystem, setEcosystem] = useState<EcosystemItem[] | null>(null);
-  const [site, setSite] = useState<SiteSettings | null>(null);
-  const [siteLoading, setSiteLoading] = useState(true);
-  const [contentLoading, setContentLoading] = useState(true);
+  const [services, setServices] = useState<ServiceItem[]>(() => dataService.getServicesSync());
+  const [hackathon, setHackathon] = useState<HackathonItem | null>(() => dataService.getHackathonSync());
+  const [projects, setProjects] = useState<ProjectItem[]>(() => dataService.getProjectsSync());
+  const [ecosystem, setEcosystem] = useState<EcosystemItem[]>(() => dataService.getEcosystemSync());
+  const [site, setSite] = useState<SiteSettings>(() => dataService.getSiteSettingsSync());
+  const [siteLoading, setSiteLoading] = useState(false);
+  const [contentLoading, setContentLoading] = useState(false);
 
   const { founder, loading: founderLoading } = useFounder();
 
@@ -33,8 +33,6 @@ export const HomePage: React.FC = () => {
       if (st) setSite(st);
     } catch {
       // Clean fallback
-    } finally {
-      setSiteLoading(false);
     }
   };
 

@@ -59,6 +59,25 @@ import {
   initialAIMLModels
 } from '../data/initialData';
 
+// Local Storage Resilient Fallbacks & Cross-Session Persistent Cache Store
+const getLocal = <T>(key: string, fallback: T): T => {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return fallback;
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const setLocal = <T>(key: string, data: T): void => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+  } catch {}
+};
+
 // High-Performance In-Memory & SWR Cache Store for 100k+ visitor scalability
 interface CacheEntry<T> {
   data: T;
@@ -68,20 +87,39 @@ interface CacheEntry<T> {
 class CacheManager {
   private cache = new Map<string, CacheEntry<any>>();
   private inflight = new Map<string, Promise<any>>();
-  private defaultTTL = 5 * 60 * 1000; // 5 minutes cache TTL for read-heavy public traffic
+  private defaultTTL = 10 * 60 * 1000; // 10 minutes cache TTL for read-heavy public traffic
 
   get<T>(key: string): T | null {
+    // 1. Fast in-memory map lookup (0ms)
     const entry = this.cache.get(key);
-    if (!entry) return null;
-    if (Date.now() - entry.timestamp > this.defaultTTL) {
-      this.cache.delete(key);
-      return null;
+    if (entry) {
+      if (Date.now() - entry.timestamp > this.defaultTTL) {
+        this.cache.delete(key);
+      } else {
+        return entry.data as T;
+      }
     }
-    return entry.data as T;
+
+    // 2. Persistent cross-session cache with timestamp verification (0.1ms)
+    try {
+      const localMeta = getLocal<{ timestamp: number; data: T } | null>(`ravan_cache_meta_${key}`, null);
+      if (localMeta && typeof localMeta.timestamp === 'number' && localMeta.data !== undefined) {
+        if (Date.now() - localMeta.timestamp < this.defaultTTL) {
+          this.cache.set(key, { data: localMeta.data, timestamp: localMeta.timestamp });
+          return localMeta.data as T;
+        }
+      }
+    } catch {}
+
+    return null;
   }
 
   set<T>(key: string, data: T): void {
-    this.cache.set(key, { data, timestamp: Date.now() });
+    const now = Date.now();
+    this.cache.set(key, { data, timestamp: now });
+    try {
+      setLocal(`ravan_cache_meta_${key}`, { data, timestamp: now });
+    } catch {}
   }
 
   invalidate(keyPrefix?: string): void {
@@ -92,8 +130,26 @@ class CacheManager {
     for (const key of this.cache.keys()) {
       if (key.startsWith(keyPrefix)) {
         this.cache.delete(key);
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            localStorage.removeItem(`ravan_cache_meta_${key}`);
+          }
+        } catch {}
       }
     }
+  }
+
+  invalidateKey(key: string): void {
+    this.cache.delete(key);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem(`ravan_cache_meta_${key}`);
+      }
+    } catch {}
+  }
+
+  clearAll(): void {
+    this.cache.clear();
   }
 
   async dedupedFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
@@ -118,14 +174,6 @@ class CacheManager {
     this.inflight.set(key, promise);
     return promise;
   }
-
-  invalidateKey(key: string): void {
-    this.cache.delete(key);
-  }
-
-  clearAll(): void {
-    this.cache.clear();
-  }
 }
 
 const memoryCache = new CacheManager();
@@ -134,22 +182,6 @@ const notifyDataUpdated = (entity: string) => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('ravan_data_updated', { detail: { entity } }));
   }
-};
-
-// Local Storage Resilient Fallbacks
-const getLocal = <T>(key: string, fallback: T): T => {
-  try {
-    const item = localStorage.getItem(key);
-    return item ? JSON.parse(item) : fallback;
-  } catch {
-    return fallback;
-  }
-};
-
-const setLocal = <T>(key: string, data: T): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch {}
 };
 
 function formatSupabaseError(error: any, tableOrEntity: string): Error {
@@ -995,13 +1027,281 @@ export const dataService = {
         const keysToRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
-          if (k && k.startsWith('ravan_')) {
+          if (k && (k.startsWith('ravan_') || k.startsWith('ravan_cache_meta_'))) {
             keysToRemove.push(k);
           }
         }
         keysToRemove.forEach(k => localStorage.removeItem(k));
       } catch {}
     }
+  },
+
+  // =========================================================================
+  // SYNCHRONOUS SWR HYDRATION LAYER (0ms First Paint / High-Traffic Resilience)
+  // =========================================================================
+
+  getSiteSettingsSync(): SiteSettings {
+    const cached = memoryCache.get<SiteSettings>('site_settings');
+    if (cached) return cached;
+    const local = getLocal<SiteSettings>('ravan_site_settings', initialSiteSettings);
+    if (local && (local.site_name || local.office_address)) {
+      memoryCache.set('site_settings', local);
+      return local;
+    }
+    return initialSiteSettings;
+  },
+
+  hasCachedSiteSettings(): boolean {
+    return memoryCache.get('site_settings') !== null || (typeof window !== 'undefined' && !!localStorage.getItem('ravan_site_settings'));
+  },
+
+  getAboutContentSync(): AboutContent {
+    const cached = memoryCache.get<AboutContent>('about_content');
+    if (cached) return cached;
+    const defaultAbout = normalizeAboutContent(null);
+    const local = getLocal<AboutContent>('ravan_about_content', defaultAbout);
+    if (local && local.overview) {
+      const normalized = normalizeAboutContent(local);
+      memoryCache.set('about_content', normalized);
+      return normalized;
+    }
+    return defaultAbout;
+  },
+
+  getFoundersSync(): Founder[] {
+    const cached = memoryCache.get<Founder[]>('founders');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<Founder[]>('ravan_founders', initialFounders);
+    const source = (Array.isArray(local) && local.length > 0) ? local : initialFounders;
+    const mapped = source.map((item, idx) => normalizeFounder(item, idx));
+    mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+    memoryCache.set('founders', mapped);
+    return mapped;
+  },
+
+  hasCachedFounders(): boolean {
+    return memoryCache.get('founders') !== null || (typeof window !== 'undefined' && !!localStorage.getItem('ravan_founders'));
+  },
+
+  getFounderSync(): Founder {
+    const founders = this.getFoundersSync();
+    const published = founders.filter(f => f.status === 'published');
+    return published[0] || founders[0] || normalizeFounder(initialFounder);
+  },
+
+  getFounderBySlugSync(slug: string): Founder | null {
+    const founders = this.getFoundersSync();
+    const cleanSlug = (slug || '').toLowerCase().trim();
+    if (!cleanSlug) return null;
+
+    const found = founders.find(f => {
+      if (f.status !== 'published') return false;
+      const explicitSlug = (f.slug || '').toLowerCase();
+      const nameSlug = generateSlug(f.name || '').toLowerCase();
+      if (explicitSlug === cleanSlug) return true;
+      if (nameSlug === cleanSlug) return true;
+      if (f.id.toLowerCase() === cleanSlug) return true;
+
+      if (f.id === 'founder-001' && (cleanSlug === 'founder' || cleanSlug === 'v-abishek' || cleanSlug === 'abishek')) {
+        return true;
+      }
+
+      const normalizedName = (f.name || '').toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      if (normalizedName === cleanSlug) return true;
+      if (cleanSlug.length > 3 && (normalizedName.includes(cleanSlug) || cleanSlug.includes(normalizedName))) return true;
+
+      return false;
+    });
+
+    return found || null;
+  },
+
+  getLeadershipSync(): LeadershipMember[] {
+    const cached = memoryCache.get<LeadershipMember[]>('leadership');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<LeadershipMember[]>('ravan_leadership', initialLeadership);
+    const source = (Array.isArray(local) && local.length > 0) ? local : initialLeadership;
+    const mapped = source.map(normalizeLeadershipMember);
+    mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+    memoryCache.set('leadership', mapped);
+    return mapped;
+  },
+
+  getLeadershipMemberBySlugSync(slug: string): LeadershipMember | null {
+    const members = this.getLeadershipSync();
+    const cleanSlug = (slug || '').toLowerCase().trim();
+    if (!cleanSlug) return null;
+
+    const found = members.find(m => {
+      if (m.status !== 'published') return false;
+      const explicitSlug = (m.slug || '').toLowerCase();
+      const nameSlug = generateSlug(m.name || '').toLowerCase();
+      if (explicitSlug === cleanSlug) return true;
+      if (nameSlug === cleanSlug) return true;
+      if (m.id.toLowerCase() === cleanSlug) return true;
+
+      const normalizedName = (m.name || '').toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      if (normalizedName === cleanSlug) return true;
+      if (cleanSlug.length > 3 && (normalizedName.includes(cleanSlug) || cleanSlug.includes(normalizedName))) return true;
+
+      return false;
+    });
+
+    return found || null;
+  },
+
+  getProfileBySlugSync(slug: string): { type: 'founder'; member: Founder } | { type: 'leadership'; member: LeadershipMember } | null {
+    const founder = this.getFounderBySlugSync(slug);
+    if (founder) return { type: 'founder', member: founder };
+
+    const member = this.getLeadershipMemberBySlugSync(slug);
+    if (member) return { type: 'leadership', member };
+
+    return null;
+  },
+
+  getServicesSync(): ServiceItem[] {
+    const cached = memoryCache.get<ServiceItem[]>('services');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<ServiceItem[]>('ravan_services', initialServices);
+    const source = (Array.isArray(local) && local.length > 0) ? local : initialServices;
+    const mapped = source.map((item, idx) => normalizeService(item, idx));
+    mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+    memoryCache.set('services', mapped);
+    return mapped;
+  },
+
+  getSolutionsSync(): SolutionItem[] {
+    const cached = memoryCache.get<SolutionItem[]>('solutions');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<SolutionItem[]>('ravan_solutions', initialSolutions);
+    const source = (Array.isArray(local) && local.length > 0) ? local : initialSolutions;
+    const mapped = source.map((item, idx) => normalizeSolution(item, idx));
+    mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+    memoryCache.set('solutions', mapped);
+    return mapped;
+  },
+
+  getProjectsSync(): ProjectItem[] {
+    const cached = memoryCache.get<ProjectItem[]>('projects');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<ProjectItem[]>('ravan_projects', initialProjects);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialProjects;
+    memoryCache.set('projects', result);
+    return result;
+  },
+
+  getHackathonsSync(): HackathonItem[] {
+    const cached = memoryCache.get<HackathonItem[]>('hackathons_list');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<HackathonItem[]>('ravan_hackathons_list', [initialHackathon]);
+    const result = (Array.isArray(local) && local.length > 0) ? local : [initialHackathon];
+    memoryCache.set('hackathons_list', result);
+    return result;
+  },
+
+  getHackathonSync(): HackathonItem {
+    const list = this.getHackathonsSync();
+    return list.find(h => h.status !== 'draft') || list[0] || initialHackathon;
+  },
+
+  getLearningProgramsSync(): LearningProgram[] {
+    const cached = memoryCache.get<LearningProgram[]>('learning');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<LearningProgram[]>('ravan_learning', initialLearningPrograms);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialLearningPrograms;
+    memoryCache.set('learning', result);
+    return result;
+  },
+
+  getEcosystemSync(): EcosystemItem[] {
+    const cached = memoryCache.get<EcosystemItem[]>('ecosystem');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<EcosystemItem[]>('ravan_ecosystem', initialEcosystem);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialEcosystem;
+    memoryCache.set('ecosystem', result);
+    return result;
+  },
+
+  getAIMLModelsSync(): AIMLModel[] {
+    const cached = memoryCache.get<AIMLModel[]>('aiml_models');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<AIMLModel[]>('ravan_aiml_models', initialAIMLModels);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialAIMLModels;
+    memoryCache.set('aiml_models', result);
+    return result;
+  },
+
+  getSEOSettingsSync(): SEOSettings {
+    const cached = memoryCache.get<SEOSettings>('seo_settings');
+    if (cached) return cached;
+    const local = getLocal<SEOSettings>('ravan_seo', initialSEOSettings);
+    const result = local || initialSEOSettings;
+    memoryCache.set('seo_settings', result);
+    return result;
+  },
+
+  getBlogPostsSync(): BlogPost[] {
+    const cached = memoryCache.get<BlogPost[]>('blog');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<BlogPost[]>('ravan_blog_posts', initialBlogPosts);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialBlogPosts;
+    memoryCache.set('blog', result);
+    return result;
+  },
+
+  getEventsSync(): EventItem[] {
+    const cached = memoryCache.get<EventItem[]>('events');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<EventItem[]>('ravan_events', initialEvents);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialEvents;
+    memoryCache.set('events', result);
+    return result;
+  },
+
+  getGalleryAlbumsSync(): GalleryAlbum[] {
+    const cached = memoryCache.get<GalleryAlbum[]>('gallery');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<GalleryAlbum[]>('ravan_gallery_albums', initialGalleryAlbums);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialGalleryAlbums;
+    memoryCache.set('gallery', result);
+    return result;
+  },
+
+  getTestimonialsSync(): TestimonialItem[] {
+    const cached = memoryCache.get<TestimonialItem[]>('testimonials');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<TestimonialItem[]>('ravan_testimonials', initialTestimonials);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialTestimonials;
+    memoryCache.set('testimonials', result);
+    return result;
+  },
+
+  getPartnersSync(): PartnerItem[] {
+    const cached = memoryCache.get<PartnerItem[]>('partners');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<PartnerItem[]>('ravan_partners', initialPartners);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialPartners;
+    memoryCache.set('partners', result);
+    return result;
+  },
+
+  getClientsSync(): ClientItem[] {
+    const cached = memoryCache.get<ClientItem[]>('clients');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<ClientItem[]>('ravan_clients', initialClients);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialClients;
+    memoryCache.set('clients', result);
+    return result;
+  },
+
+  getNavigationSync(): NavigationItem[] {
+    const cached = memoryCache.get<NavigationItem[]>('navigation');
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    const local = getLocal<NavigationItem[]>('ravan_navigation', initialNavigation);
+    const result = (Array.isArray(local) && local.length > 0) ? local : initialNavigation;
+    memoryCache.set('navigation', result);
+    return result;
   },
 
   // --- SITE SETTINGS & LOGO MANAGEMENT ---

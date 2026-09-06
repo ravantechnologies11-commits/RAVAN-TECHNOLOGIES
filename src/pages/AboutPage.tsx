@@ -45,20 +45,17 @@ const renderDynamicIcon = (name?: string, className: string = 'w-6 h-6') => {
 };
 
 export const AboutPage: React.FC = () => {
-  const [content, setContent] = useState<AboutContent | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [content, setContent] = useState<AboutContent>(() => dataService.getAboutContentSync());
+  const [loading, setLoading] = useState(false);
   const { founder } = useFounder();
 
   useEffect(() => {
     let isMounted = true;
     dataService.getAboutContent().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setContent(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getAboutContent(true).then((data) => {

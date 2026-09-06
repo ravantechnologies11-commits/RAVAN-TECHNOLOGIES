@@ -31,29 +31,33 @@ export function updateDocumentFavicon(url: string) {
  * Global Brand Hook: Single source of truth for Ravan Technologies logo, company coordinates, and favicon.
  */
 export function useBrandLogo() {
-  const [site, setSite] = useState<SiteSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [site, setSite] = useState<SiteSettings>(() => dataService.getSiteSettingsSync());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    // 1. Initial fetch from canonical dataService (reads from Supabase / cache)
+    // Initial favicon update from synchronous cache
+    const initialFav = site?.favicon_url || site?.logo_url;
+    if (initialFav) {
+      updateDocumentFavicon(initialFav);
+    }
+
+    // Background revalidation from database / SWR cache
     dataService.getSiteSettings().then((settings) => {
-      if (isMounted) {
+      if (isMounted && settings) {
         setSite(settings);
-        setLoading(false);
         const targetFavicon = settings?.favicon_url || settings?.logo_url;
         if (targetFavicon) {
           updateDocumentFavicon(targetFavicon);
         }
       }
-    });
+    }).catch(() => {});
 
     // 2. Real-time event listener for live branding broadcasts
     const handleBrandUpdate = (e: CustomEvent<SiteSettings>) => {
       if (isMounted && e.detail) {
         setSite(e.detail);
-        setLoading(false);
         const targetFavicon = e.detail.favicon_url || e.detail.logo_url;
         if (targetFavicon) {
           updateDocumentFavicon(targetFavicon);

@@ -9,19 +9,16 @@ import { CheckCircle2, ArrowRight, Layers, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const SolutionsPage: React.FC = () => {
-  const [solutions, setSolutions] = useState<SolutionItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [solutions, setSolutions] = useState<SolutionItem[]>(() => dataService.getSolutionsSync());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getSolutions().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setSolutions(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getSolutions(true).then((data) => {

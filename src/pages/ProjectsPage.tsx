@@ -8,20 +8,17 @@ import { initialProjects } from '../data/initialData';
 import { ArrowUpRight, FolderGit2, Sparkles, Filter } from 'lucide-react';
 
 export const ProjectsPage: React.FC = () => {
-  const [projects, setProjects] = useState<ProjectItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<ProjectItem[]>(() => dataService.getProjectsSync());
+  const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
   useEffect(() => {
     let isMounted = true;
     dataService.getProjects().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setProjects(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getProjects().then((data) => {

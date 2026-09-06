@@ -32,14 +32,14 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   customSchema
 }) => {
   const { site, logoUrl, siteName, tagline } = useBrandLogo();
-  const [founder, setFounder] = useState<Founder | null>(null);
-  const [seo, setSeo] = useState<any | null>(null);
+  const [founder, setFounder] = useState<Founder | null>(() => dataService.getFounderSync());
+  const [seo, setSeo] = useState<any | null>(() => dataService.getSEOSettingsSync());
 
   // Load authoritative Founder profile and SEO settings from database
   useEffect(() => {
     let isMounted = true;
-    dataService.getFounder().then(f => { if (isMounted) setFounder(f); }).catch(() => {});
-    dataService.getSEOSettings().then(s => { if (isMounted) setSeo(s); }).catch(() => {});
+    dataService.getFounder().then(f => { if (isMounted && f) setFounder(f); }).catch(() => {});
+    dataService.getSEOSettings().then(s => { if (isMounted && s) setSeo(s); }).catch(() => {});
 
     const handleUpdate = (e: any) => {
       if (!e.detail || e.detail.key === 'seo' || e.detail.key === 'site_settings' || e.detail.key === 'founder') {

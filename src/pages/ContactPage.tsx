@@ -9,7 +9,7 @@ import { SiteSettings } from '../types';
 
 export const ContactPage: React.FC = () => {
   const { showToast } = useToast();
-  const [site, setSite] = useState<SiteSettings | null>(null);
+  const [site, setSite] = useState<SiteSettings>(() => dataService.getSiteSettingsSync());
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -26,7 +26,7 @@ export const ContactPage: React.FC = () => {
     let isMounted = true;
     dataService.getSiteSettings().then(st => {
       if (isMounted && st) setSite(st);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getSiteSettings().then(st => {

@@ -8,19 +8,16 @@ import { initialGalleryAlbums } from '../data/initialData';
 import { Images } from 'lucide-react';
 
 export const GalleryPage: React.FC = () => {
-  const [albums, setAlbums] = useState<GalleryAlbum[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [albums, setAlbums] = useState<GalleryAlbum[]>(() => dataService.getGalleryAlbumsSync());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getGalleryAlbums().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setAlbums(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getGalleryAlbums().then((data) => {

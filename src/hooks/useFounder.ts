@@ -8,9 +8,13 @@ import { Founder } from '../types';
  * Initializes to null with loading=true to prevent flashing stale mock data on initial load.
  */
 export function useFounder() {
-  const [founder, setFounder] = useState<Founder | null>(null);
-  const [founders, setFounders] = useState<Founder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [founders, setFounders] = useState<Founder[]>(() => dataService.getFoundersSync());
+  const [founder, setFounder] = useState<Founder | null>(() => {
+    const list = dataService.getFoundersSync();
+    const published = list.filter(f => f.status === 'published');
+    return published[0] || null;
+  });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -23,14 +27,11 @@ export function useFounder() {
             const published = data.filter(f => f.status === 'published');
             setFounder(published[0] || null);
           }
-          setLoading(false);
         }
-      }).catch(() => {
-        if (isMounted) setLoading(false);
-      });
+      }).catch(() => {});
     };
 
-    // 1. Initial fetch from canonical dataService (reads from Supabase / cache)
+    // 1. Background revalidation from canonical dataService
     dataService.getFounders().then((data) => {
       if (isMounted) {
         if (Array.isArray(data)) {
@@ -38,11 +39,8 @@ export function useFounder() {
           const published = data.filter(f => f.status === 'published');
           setFounder(published[0] || null);
         }
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     // 2. Real-time event listener for live founder broadcasts
     const handleFounderUpdate = (e: CustomEvent<Founder>) => {

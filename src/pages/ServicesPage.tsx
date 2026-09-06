@@ -44,21 +44,18 @@ const renderFeatureIcon = (iconName?: string) => {
 };
 
 export const ServicesPage: React.FC = () => {
-  const [services, setServices] = useState<ServiceItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [services, setServices] = useState<ServiceItem[]>(() => dataService.getServicesSync());
+  const [loading, setLoading] = useState(false);
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getServices().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setServices(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getServices(true).then((data) => {

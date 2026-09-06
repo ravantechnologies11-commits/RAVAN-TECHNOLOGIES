@@ -9,19 +9,16 @@ import { Calendar, MapPin, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const EventsPage: React.FC = () => {
-  const [events, setEvents] = useState<EventItem[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState<EventItem[]>(() => dataService.getEventsSync());
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getEvents().then((data) => {
-      if (isMounted) {
+      if (isMounted && data) {
         setEvents(data);
-        setLoading(false);
       }
-    }).catch(() => {
-      if (isMounted) setLoading(false);
-    });
+    }).catch(() => {});
 
     const handleUpdate = () => {
       dataService.getEvents().then((data) => {
