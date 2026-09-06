@@ -27,9 +27,9 @@ export const HomePage: React.FC = () => {
   const { founder, loading: founderLoading } = useFounder();
 
   // 1. Critical Above-the-fold Hero & Site Settings (Fast path)
-  const loadSiteSettings = async () => {
+  const loadSiteSettings = async (forceRefresh = false) => {
     try {
-      const st = await dataService.getSiteSettings();
+      const st = await dataService.getSiteSettings(forceRefresh);
       if (st) setSite(st);
     } catch {
       // Clean fallback
@@ -37,13 +37,13 @@ export const HomePage: React.FC = () => {
   };
 
   // 2. Secondary Below-the-fold Content (Progressive path, non-blocking)
-  const loadSecondaryContent = async () => {
+  const loadSecondaryContent = async (forceRefresh = false) => {
     try {
       const [s, h, p, e] = await Promise.all([
-        dataService.getServices(),
-        dataService.getHackathon(),
-        dataService.getProjects(),
-        dataService.getEcosystem()
+        dataService.getServices(forceRefresh),
+        dataService.getHackathon(forceRefresh),
+        dataService.getProjects(forceRefresh),
+        dataService.getEcosystem(forceRefresh)
       ]);
       setServices(s);
       setHackathon(h);
@@ -63,26 +63,21 @@ export const HomePage: React.FC = () => {
     loadSecondaryContent();
 
     // Listen for live CMS updates across tabs/windows
-    const handleDataUpdate = (e: any) => {
-      const entity = e?.detail?.entity;
-      if (!entity || entity === 'site_settings') loadSiteSettings();
-      if (!entity || entity !== 'site_settings') loadSecondaryContent();
-    };
-
-    const handleSiteSettingsUpdate = (e: any) => {
-      if (e?.detail) {
-        setSite(e.detail);
-        setSiteLoading(false);
-      } else {
-        loadSiteSettings();
+    const unsubscribe = dataService.subscribeToUpdates((entity, data) => {
+      if (!entity || entity === 'site_settings' || entity === 'site') {
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          setSite(data);
+        } else {
+          loadSiteSettings(true);
+        }
       }
-    };
+      if (!entity || (entity !== 'site_settings' && entity !== 'site')) {
+        loadSecondaryContent(true);
+      }
+    });
 
-    window.addEventListener('ravan_data_updated', handleDataUpdate);
-    window.addEventListener('ravan_site_settings_updated' as any, handleSiteSettingsUpdate);
     return () => {
-      window.removeEventListener('ravan_data_updated', handleDataUpdate);
-      window.removeEventListener('ravan_site_settings_updated' as any, handleSiteSettingsUpdate);
+      unsubscribe();
     };
   }, []);
 

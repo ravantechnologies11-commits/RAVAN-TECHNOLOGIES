@@ -28,15 +28,22 @@ export const ContactPage: React.FC = () => {
       if (isMounted && st) setSite(st);
     }).catch(() => {});
 
-    const handleUpdate = () => {
-      dataService.getSiteSettings().then(st => {
-        if (isMounted && st) setSite(st);
-      });
-    };
-    window.addEventListener('ravan_site_settings_updated' as any, handleUpdate);
+    const unsubscribe = dataService.subscribeToUpdates((entity, data) => {
+      if (!isMounted) return;
+      if (!entity || entity === 'site_settings' || entity === 'site') {
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          setSite(data);
+        } else {
+          dataService.getSiteSettings(true).then(st => {
+            if (isMounted && st) setSite(st);
+          });
+        }
+      }
+    });
+
     return () => {
       isMounted = false;
-      window.removeEventListener('ravan_site_settings_updated' as any, handleUpdate);
+      unsubscribe();
     };
   }, []);
 
@@ -68,7 +75,7 @@ export const ContactPage: React.FC = () => {
     }
   };
 
-  const contactEmail = site?.contact_email || 'ravantechnology001@gmail.com';
+  const contactEmail = site?.contact_email || 'ravantechnologies11@gmail.com';
   const contactPhone = site?.contact_phone || '';
   const officeAddress = site?.hq_location || site?.office_address || 'Thiruvannamalai, Tamil Nadu, India';
 

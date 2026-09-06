@@ -10,25 +10,31 @@ import { Link } from 'react-router-dom';
 
 export const HackathonsPage: React.FC = () => {
   const [hackathon, setHackathon] = useState<HackathonItem | null>(() => dataService.getHackathonSync());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(() => !hackathon);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getHackathon().then((data) => {
-      if (isMounted && data) {
-        setHackathon(data);
+      if (isMounted) {
+        if (data) setHackathon(data);
+        setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) setLoading(false);
+    });
 
-    const handleUpdate = () => {
-      dataService.getHackathon().then((data) => {
-        if (isMounted) setHackathon(data);
-      });
-    };
-    window.addEventListener('ravan_data_updated', handleUpdate);
+    const unsubscribe = dataService.subscribeToUpdates((entity) => {
+      if (!isMounted) return;
+      if (!entity || entity.includes('hackathon')) {
+        dataService.getHackathon(true).then((fresh) => {
+          if (isMounted && fresh) setHackathon(fresh);
+        });
+      }
+    });
+
     return () => {
       isMounted = false;
-      window.removeEventListener('ravan_data_updated', handleUpdate);
+      unsubscribe();
     };
   }, []);
 

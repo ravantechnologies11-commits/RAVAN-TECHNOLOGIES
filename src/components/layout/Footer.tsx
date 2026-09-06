@@ -36,13 +36,22 @@ export const Footer: React.FC = () => {
       }
     }).catch(() => {});
 
-    const handleUpdate = (e: any) => {
-      if (isMounted && e.detail) setSite(e.detail);
-    };
-    window.addEventListener('ravan_site_settings_updated', handleUpdate);
+    const unsubscribe = dataService.subscribeToUpdates((entity, data) => {
+      if (!isMounted) return;
+      if (!entity || entity === 'site_settings' || entity === 'site') {
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          setSite(data);
+        } else {
+          dataService.getSiteSettings(true).then(st => {
+            if (isMounted && st) setSite(st);
+          });
+        }
+      }
+    });
+
     return () => {
       isMounted = false;
-      window.removeEventListener('ravan_site_settings_updated', handleUpdate);
+      unsubscribe();
     };
   }, []);
 

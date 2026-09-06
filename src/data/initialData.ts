@@ -820,7 +820,7 @@ export const initialSiteSettings: SiteSettings = {
   tagline: 'Building Technology. Solving Real Problems.',
   description: 'Architecting sovereign software systems, enterprise intelligence, and physical computing infrastructure for institutional scale.',
   logo_url: 'https://iecesxahkbkkafzmzwcd.supabase.co/storage/v1/object/public/site-assets/branding/ravan-logo.png?v=1788066287989',
-  contact_email: 'ravantechnology001@gmail.com',
+  contact_email: 'ravantechnologies11@gmail.com',
   contact_phone: '',
   office_address: 'Ravan Technologies Headquarters, Thiruvannamalai, Tamil Nadu, India',
   hq_location: 'Thiruvannamalai, Tamil Nadu, India',

@@ -82,35 +82,105 @@ const setLocal = <T>(key: string, data: T): void => {
   } catch {}
 };
 
-// High-Performance In-Memory & SWR Cache Store for 100k+ visitor scalability
-interface CacheEntry<T> {
+// High-Performance In-Memory & SWR Cache Store with Multi-Tab Broadcast Sync
+export interface CacheEntry<T> {
   data: T;
   timestamp: number;
+  isDbVerified: boolean;
 }
+
+let syncChannel: BroadcastChannel | null = null;
+try {
+  if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+    syncChannel = new BroadcastChannel('ravan_data_sync');
+  }
+} catch {}
+
+export const broadcastDataUpdated = (entity: string, data?: any) => {
+  if (typeof window === 'undefined') return;
+
+  // 1. Same-window custom events
+  window.dispatchEvent(new CustomEvent('ravan_data_updated', { detail: { entity, data } }));
+  if (entity === 'site_settings' || entity === 'site') {
+    window.dispatchEvent(new CustomEvent('ravan_site_settings_updated', { detail: data }));
+  }
+  if (entity === 'founders' || entity === 'founder') {
+    window.dispatchEvent(new CustomEvent('ravan_founders_updated', { detail: data }));
+    window.dispatchEvent(new CustomEvent('ravan_founder_updated', { detail: Array.isArray(data) ? data[0] : data }));
+  }
+
+  // 2. Cross-tab BroadcastChannel
+  try {
+    syncChannel?.postMessage({ entity, data, timestamp: Date.now() });
+  } catch {}
+
+  // 3. Cross-tab storage event beacon (universal across all browsers & tabs)
+  try {
+    localStorage.setItem('ravan_sync_beacon', JSON.stringify({ entity, t: Date.now() }));
+  } catch {}
+};
+
+const notifyDataUpdated = (entity: string, data?: any) => {
+  broadcastDataUpdated(entity, data);
+};
 
 class CacheManager {
   private cache = new Map<string, CacheEntry<any>>();
   private inflight = new Map<string, Promise<any>>();
-  private defaultTTL = 10 * 60 * 1000; // 10 minutes cache TTL for read-heavy public traffic
+  private defaultTTL = 5 * 60 * 1000; // 5 minutes cache TTL
+  private staleRevalidateThreshold = 3000; // 3 seconds before background revalidation is allowed
 
-  get<T>(key: string): T | null {
+  constructor() {
+    // Listen for cross-tab broadcast notifications to invalidate local in-memory cache
+    if (typeof window !== 'undefined') {
+      if (syncChannel) {
+        syncChannel.addEventListener('message', (e: MessageEvent) => {
+          if (e.data?.entity) {
+            this.invalidateKey(e.data.entity);
+            this.invalidateKey(`${e.data.entity}_list`);
+            window.dispatchEvent(new CustomEvent('ravan_data_updated', { detail: { entity: e.data.entity, data: e.data.data } }));
+          }
+        });
+      }
+
+      window.addEventListener('storage', (e: StorageEvent) => {
+        if (e.key === 'ravan_sync_beacon' && e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue);
+            if (parsed?.entity) {
+              this.invalidateKey(parsed.entity);
+              this.invalidateKey(`${parsed.entity}_list`);
+              window.dispatchEvent(new CustomEvent('ravan_data_updated', { detail: { entity: parsed.entity } }));
+            }
+          } catch {}
+        }
+      });
+    }
+  }
+
+  getEntry<T>(key: string): CacheEntry<T> | null {
     // 1. Fast in-memory map lookup (0ms)
     const entry = this.cache.get(key);
     if (entry) {
       if (Date.now() - entry.timestamp > this.defaultTTL) {
         this.cache.delete(key);
       } else {
-        return entry.data as T;
+        return entry as CacheEntry<T>;
       }
     }
 
     // 2. Persistent cross-session cache with timestamp verification (0.1ms)
     try {
-      const localMeta = getLocal<{ timestamp: number; data: T } | null>(`ravan_cache_meta_${key}`, null);
+      const localMeta = getLocal<{ timestamp: number; data: T; isDbVerified?: boolean } | null>(`ravan_cache_meta_${key}`, null);
       if (localMeta && typeof localMeta.timestamp === 'number' && localMeta.data !== undefined) {
         if (Date.now() - localMeta.timestamp < this.defaultTTL) {
-          this.cache.set(key, { data: localMeta.data, timestamp: localMeta.timestamp });
-          return localMeta.data as T;
+          const restoredEntry: CacheEntry<T> = {
+            data: localMeta.data,
+            timestamp: localMeta.timestamp,
+            isDbVerified: Boolean(localMeta.isDbVerified)
+          };
+          this.cache.set(key, restoredEntry);
+          return restoredEntry;
         }
       }
     } catch {}
@@ -118,11 +188,21 @@ class CacheManager {
     return null;
   }
 
-  set<T>(key: string, data: T): void {
+  get<T>(key: string): T | null {
+    const entry = this.getEntry<T>(key);
+    return entry ? entry.data : null;
+  }
+
+  getData<T>(key: string): T | null {
+    return this.get<T>(key);
+  }
+
+  set<T>(key: string, data: T, isDbVerified: boolean = false): void {
     const now = Date.now();
-    this.cache.set(key, { data, timestamp: now });
+    const entry: CacheEntry<T> = { data, timestamp: now, isDbVerified };
+    this.cache.set(key, entry);
     try {
-      setLocal(`ravan_cache_meta_${key}`, { data, timestamp: now });
+      setLocal(`ravan_cache_meta_${key}`, entry);
     } catch {}
   }
 
@@ -145,6 +225,7 @@ class CacheManager {
 
   invalidateKey(key: string): void {
     this.cache.delete(key);
+    this.inflight.delete(key);
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.removeItem(`ravan_cache_meta_${key}`);
@@ -154,39 +235,92 @@ class CacheManager {
 
   clearAll(): void {
     this.cache.clear();
+    this.inflight.clear();
   }
 
-  async dedupedFetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
-    const cached = this.get<T>(key);
-    if (cached !== null) return cached;
+  /**
+   * Stale-While-Revalidate fetcher:
+   * - If forceRefresh: purges cache and forces fresh network query
+   * - If isDbVerified && age < threshold: returns instant cache (prevents duplicate micro-queries)
+   * - If isDbVerified && age >= threshold: returns instant cache AND triggers background revalidation
+   * - If unverified/empty: awaits live database query so public UI never displays stale fallback data
+   */
+  async swrFetch<T>(
+    key: string,
+    fetcher: () => Promise<T>,
+    options?: { forceRefresh?: boolean; staleThresholdMs?: number }
+  ): Promise<T> {
+    if (options?.forceRefresh) {
+      this.invalidateKey(key);
+    }
 
+    const cached = this.getEntry<T>(key);
+
+    // If we have verified database data and no forceRefresh:
+    if (cached && cached.isDbVerified && !options?.forceRefresh) {
+      const age = Date.now() - cached.timestamp;
+      const threshold = options?.staleThresholdMs ?? this.staleRevalidateThreshold;
+
+      // Ultra-fresh (e.g. within 3s): return immediately without network call
+      if (age < threshold) {
+        return cached.data;
+      }
+
+      // Stale-While-Revalidate: serve cached verified data immediately and revalidate in background
+      this.revalidateInBackground(key, fetcher, cached.data);
+      return cached.data;
+    }
+
+    // Cache miss or unverified sync placeholder: MUST query network directly!
     if (this.inflight.has(key)) {
       return this.inflight.get(key) as Promise<T>;
     }
 
     const promise = fetcher()
-      .then(data => {
-        this.set(key, data);
+      .then(freshData => {
+        this.set(key, freshData, true);
         this.inflight.delete(key);
-        return data;
+        return freshData;
       })
       .catch(err => {
         this.inflight.delete(key);
+        if (cached && cached.data !== undefined) {
+          return cached.data;
+        }
         throw err;
       });
 
     this.inflight.set(key, promise);
     return promise;
   }
+
+  async dedupedFetch<T>(key: string, fetcher: () => Promise<T>, forceRefresh: boolean = false): Promise<T> {
+    return this.swrFetch(key, fetcher, { forceRefresh });
+  }
+
+  private async revalidateInBackground<T>(key: string, fetcher: () => Promise<T>, currentData: T): Promise<void> {
+    if (this.inflight.has(key)) return;
+
+    const bgPromise = fetcher()
+      .then(freshData => {
+        this.inflight.delete(key);
+        this.set(key, freshData, true);
+        try {
+          if (JSON.stringify(freshData) !== JSON.stringify(currentData)) {
+            broadcastDataUpdated(key, freshData);
+          }
+        } catch {}
+        return freshData;
+      })
+      .catch(() => {
+        this.inflight.delete(key);
+      });
+
+    this.inflight.set(key, bgPromise);
+  }
 }
 
 const memoryCache = new CacheManager();
-
-const notifyDataUpdated = (entity: string) => {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('ravan_data_updated', { detail: { entity } }));
-  }
-};
 
 function formatSupabaseError(error: any, tableOrEntity: string): Error {
   const msg = error?.message || '';
@@ -1339,6 +1473,41 @@ export const dataService = {
     }
   },
 
+  subscribeToUpdates(callback: (entity: string, data?: any) => void): () => void {
+    if (typeof window === 'undefined') return () => {};
+
+    const handleWindow = (e: any) => {
+      const entity = e?.detail?.entity || 'all';
+      const data = e?.detail?.data;
+      callback(entity, data);
+    };
+
+    const handleBroadcast = (e: MessageEvent) => {
+      if (e.data?.entity) {
+        callback(e.data.entity, e.data.data);
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'ravan_sync_beacon' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed?.entity) callback(parsed.entity);
+        } catch {}
+      }
+    };
+
+    window.addEventListener('ravan_data_updated', handleWindow);
+    if (syncChannel) syncChannel.addEventListener('message', handleBroadcast);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('ravan_data_updated', handleWindow);
+      if (syncChannel) syncChannel.removeEventListener('message', handleBroadcast);
+      window.removeEventListener('storage', handleStorage);
+    };
+  },
+
   // =========================================================================
   // SYNCHRONOUS SWR HYDRATION LAYER (0ms First Paint / High-Traffic Resilience)
   // =========================================================================
@@ -1495,17 +1664,29 @@ export const dataService = {
   },
 
   getHackathonsSync(): HackathonItem[] {
-    const cached = memoryCache.get<HackathonItem[]>('hackathons_list');
+    const cached = memoryCache.getData<HackathonItem[]>('hackathons_list');
     if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<HackathonItem[]>('ravan_hackathons_list', [initialHackathon]);
-    const result = (Array.isArray(local) && local.length > 0) ? local : [initialHackathon];
-    memoryCache.set('hackathons_list', result);
-    return result;
+    const local = getLocal<HackathonItem[]>('ravan_hackathons_list', []);
+    if (Array.isArray(local) && local.length > 0) {
+      memoryCache.set('hackathons_list', local, false);
+      return local;
+    }
+    return [];
   },
 
-  getHackathonSync(): HackathonItem {
+  getHackathonSync(): HackathonItem | null {
     const list = this.getHackathonsSync();
-    return list.find(h => h.status !== 'draft') || list[0] || initialHackathon;
+    if (list.length > 0) {
+      return list.find(h => h.status !== 'draft') || list[0];
+    }
+    const cachedSingle = memoryCache.getData<HackathonItem>('hackathon');
+    if (cachedSingle) return cachedSingle;
+    const localSingle = getLocal<HackathonItem | null>('ravan_hackathon', null);
+    if (localSingle) {
+      memoryCache.set('hackathon', localSingle, false);
+      return localSingle;
+    }
+    return null;
   },
 
   getLearningProgramsSync(): LearningProgram[] {
@@ -1609,17 +1790,14 @@ export const dataService = {
 
   // --- SITE SETTINGS & LOGO MANAGEMENT ---
   async getSiteSettings(forceRefresh: boolean = false): Promise<SiteSettings> {
-    if (forceRefresh) memoryCache.invalidate('site_settings');
-    return memoryCache.dedupedFetch('site_settings', async () => {
+    return memoryCache.swrFetch('site_settings', async () => {
       const local = getLocal<SiteSettings>('ravan_site_settings', initialSiteSettings);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('site_settings').select('*').single();
           if (!error && data) {
             const meta = data?.social_links?._meta || {};
-            const cleanOfficeAddress = (data.office_address && !data.office_address.includes('Bengaluru'))
-              ? data.office_address
-              : (meta.office_address || initialSiteSettings.office_address);
+            const cleanOfficeAddress = data.office_address || meta.office_address || initialSiteSettings.office_address;
 
             const normalized: SiteSettings = {
               ...initialSiteSettings,
@@ -1655,7 +1833,7 @@ export const dataService = {
         if (import.meta.env.DEV) console.warn('Supabase getSiteSettings fallback:', err);
       }
       return local;
-    });
+    }, { forceRefresh });
   },
 
   async updateSiteSettings(updated: Partial<SiteSettings>): Promise<SiteSettings> {
@@ -1722,28 +1900,33 @@ export const dataService = {
           throw formatSupabaseError(fallbackRes.error, 'site_settings');
         }
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const { data: verified, error: verifyErr } = await supabase
+        .from('site_settings')
+        .select('*')
+        .eq('id', 'primary_settings')
+        .single();
+
+      if (verifyErr || !verified) {
+        throw new Error(`Database persistence verification failed for Site Settings: ${verifyErr?.message || 'Record not returned from Supabase'}`);
+      }
     }
 
     setLocal('ravan_site_settings', merged);
-    memoryCache.set('site_settings', merged);
+    memoryCache.set('site_settings', merged, true);
 
     try {
       await this.addAuditLog('UPDATE', 'SITE_SETTINGS', 'primary_settings', 'Updated site settings & brand hero image configuration');
     } catch {}
 
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ravan_site_settings_updated', { detail: merged }));
-    }
-    notifyDataUpdated('site_settings');
-
+    broadcastDataUpdated('site_settings', merged);
     return merged;
   },
 
   // --- ABOUT US ---
   async getAboutContent(forceRefresh: boolean = false): Promise<AboutContent> {
-    if (forceRefresh) memoryCache.invalidate('about_content');
-
-    return memoryCache.dedupedFetch('about_content', async () => {
+    return memoryCache.swrFetch('about_content', async () => {
       const defaultAbout = normalizeAboutContent(null);
       const local = getLocal<AboutContent>('ravan_about_content', defaultAbout);
       try {
@@ -1759,7 +1942,7 @@ export const dataService = {
         if (import.meta.env.DEV) console.warn('Supabase getAboutContent fallback:', err);
       }
       return normalizeAboutContent(local);
-    });
+    }, { forceRefresh });
   },
 
   async saveAboutContent(content: AboutContent): Promise<AboutContent> {
@@ -1771,60 +1954,64 @@ export const dataService = {
         if (import.meta.env.DEV) console.error('Supabase error saving about content:', error.message);
         throw formatSupabaseError(error, 'site_settings');
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const { data: verified, error: verifyErr } = await supabase
+        .from('site_settings')
+        .select('about_content')
+        .eq('id', 'primary_settings')
+        .single();
+      if (verifyErr || !verified?.about_content) {
+        throw new Error(`Database persistence verification failed for About Content: ${verifyErr?.message || 'Verification record missing'}`);
+      }
     }
 
     setLocal('ravan_about_content', normalized);
-    memoryCache.set('about_content', normalized);
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ravan_about_updated', { detail: normalized }));
-    }
+    memoryCache.set('about_content', normalized, true);
 
     try {
-      await this.addAuditLog('UPDATE', 'ABOUT', 'primary_settings', 'Updated About Us mandate & trajectory content');
+      await this.addAuditLog('UPDATE', 'ABOUT', undefined, 'Updated about company vision & milestones');
     } catch {}
 
-    notifyDataUpdated('about');
+    broadcastDataUpdated('about', normalized);
     return normalized;
   },
 
   // --- FOUNDERS MANAGEMENT ---
   async getFounders(forceRefresh: boolean = false): Promise<Founder[]> {
-    if (forceRefresh) {
-      memoryCache.invalidate('founders');
-      memoryCache.invalidate('founder');
-    }
-    return memoryCache.dedupedFetch('founders', async () => {
+    return memoryCache.swrFetch('founders', async () => {
       const local = getLocal<Founder[]>('ravan_founders', initialFounders);
       try {
         if (supabase) {
           let data: any[] | null = null;
           const resWithOrder = await supabase.from('founders').select('*').order('display_order');
-          if (!resWithOrder.error && Array.isArray(resWithOrder.data) && resWithOrder.data.length > 0) {
+          if (!resWithOrder.error && Array.isArray(resWithOrder.data)) {
             data = resWithOrder.data;
           } else {
             const resFallback = await supabase.from('founders').select('*');
-            if (!resFallback.error && Array.isArray(resFallback.data) && resFallback.data.length > 0) {
+            if (!resFallback.error && Array.isArray(resFallback.data)) {
               data = resFallback.data;
             }
           }
 
-          if (data && data.length > 0) {
+          if (data) {
             const normalized = data.map((item, idx) => normalizeFounder(item, idx));
             normalized.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
             setLocal('ravan_founders', normalized);
-            setLocal('ravan_founder', normalized[0]);
-            memoryCache.set('founder', normalized[0]);
+            if (normalized.length > 0) {
+              setLocal('ravan_founder', normalized[0]);
+              memoryCache.set('founder', normalized[0], true);
+            }
             return normalized;
           }
         }
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getFounders fallback:', err);
       }
-      const mapped = local.map((item, idx) => normalizeFounder(item, idx));
+      const mapped = (Array.isArray(local) && local.length > 0 ? local : initialFounders).map((item, idx) => normalizeFounder(item, idx));
       mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       return mapped;
-    });
+    }, { forceRefresh });
   },
 
   async getFounder(forceRefresh: boolean = false): Promise<Founder> {
@@ -1861,7 +2048,7 @@ export const dataService = {
   },
 
   async saveFounders(founders: Founder[]): Promise<Founder[]> {
-    const normalized = founders.map((f, idx) => normalizeFounder(f, idx));
+    let normalized = founders.map((f, idx) => normalizeFounder(f, idx));
 
     if (supabase) {
       const rowsForDb = normalized.map(f => {
@@ -1946,23 +2133,36 @@ export const dataService = {
           throw formatSupabaseError(fallbackRes.error, 'founders');
         }
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const ids = normalized.map(f => f.id);
+      const { data: verifiedRows, error: verifyErr } = await supabase
+        .from('founders')
+        .select('*')
+        .in('id', ids);
+
+      if (verifyErr) {
+        throw new Error(`Database persistence verification failed for Founders: ${verifyErr.message}`);
+      }
+      if (!verifiedRows || verifiedRows.length !== ids.length) {
+        throw new Error(`Database persistence verification mismatch: Saved ${ids.length} founders, but database confirmed ${verifiedRows ? verifiedRows.length : 0}`);
+      }
+      normalized = verifiedRows.map((item, idx) => normalizeFounder(item, idx));
+      normalized.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
     }
 
     setLocal('ravan_founders', normalized);
-    setLocal('ravan_founder', normalized[0] || initialFounder);
-    memoryCache.set('founders', normalized);
-    memoryCache.set('founder', normalized[0] || initialFounder);
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ravan_founders_updated', { detail: normalized }));
-      window.dispatchEvent(new CustomEvent('ravan_founder_updated', { detail: normalized[0] }));
+    if (normalized.length > 0) {
+      setLocal('ravan_founder', normalized[0]);
+      memoryCache.set('founder', normalized[0], true);
     }
+    memoryCache.set('founders', normalized, true);
 
     try {
       await this.addAuditLog('UPDATE', 'FOUNDERS', undefined, `Updated Founders roster (${normalized.length} founders)`);
     } catch {}
 
-    notifyDataUpdated('founder');
+    broadcastDataUpdated('founders', normalized);
     return normalized;
   },
 
@@ -1986,8 +2186,7 @@ export const dataService = {
 
   // --- LEADERSHIP ---
   async getLeadership(forceRefresh: boolean = false): Promise<LeadershipMember[]> {
-    if (forceRefresh) memoryCache.invalidate('leadership');
-    return memoryCache.dedupedFetch('leadership', async () => {
+    return memoryCache.swrFetch('leadership', async () => {
       const local = getLocal<LeadershipMember[]>('ravan_leadership', initialLeadership);
       try {
         if (supabase) {
@@ -2001,8 +2200,8 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getLeadership fallback:', err);
       }
-      return local.map(normalizeLeadershipMember);
-    });
+      return (Array.isArray(local) && local.length > 0 ? local : initialLeadership).map(normalizeLeadershipMember);
+    }, { forceRefresh });
   },
 
   async getLeadershipMemberBySlug(slug: string): Promise<LeadershipMember | null> {
@@ -2018,7 +2217,6 @@ export const dataService = {
       if (nameSlug === cleanSlug) return true;
       if (m.id.toLowerCase() === cleanSlug) return true;
 
-      // Match normalized name e.g. "a-berry-sugandh-surya" or "berry-sugandh-surya"
       const normalizedName = (m.name || '').toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
       if (normalizedName === cleanSlug) return true;
       if (cleanSlug.length > 3 && (normalizedName.includes(cleanSlug) || cleanSlug.includes(normalizedName))) return true;
@@ -2030,10 +2228,9 @@ export const dataService = {
   },
 
   async saveLeadership(members: LeadershipMember[]): Promise<LeadershipMember[]> {
-    const normalizedMembers = members.map(normalizeLeadershipMember);
+    let normalizedMembers = members.map(normalizeLeadershipMember);
 
     if (supabase) {
-      // Pack extended fields into social_links._meta to guarantee schema compatibility
       const rowsForDb = normalizedMembers.map(m => {
         const {
           slug,
@@ -2103,28 +2300,35 @@ export const dataService = {
         if (import.meta.env.DEV) console.error('Supabase error saving leadership:', error.message);
         throw formatSupabaseError(error, 'leadership');
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const ids = normalizedMembers.map(m => m.id);
+      const { data: verified, error: verifyErr } = await supabase.from('leadership').select('*').in('id', ids);
+      if (verifyErr || !verified || verified.length !== ids.length) {
+        throw new Error(`Database verification mismatch for Leadership: ${verifyErr?.message || `Expected ${ids.length} records, found ${verified?.length || 0}`}`);
+      }
+      normalizedMembers = verified.map(normalizeLeadershipMember);
     }
 
     setLocal('ravan_leadership', normalizedMembers);
-    memoryCache.set('leadership', normalizedMembers);
+    memoryCache.set('leadership', normalizedMembers, true);
 
     try {
       await this.addAuditLog('UPDATE', 'LEADERSHIP', undefined, `Updated leadership roster (${normalizedMembers.length} members)`);
     } catch {}
 
-    notifyDataUpdated('leadership');
+    broadcastDataUpdated('leadership', normalizedMembers);
     return normalizedMembers;
   },
 
   // --- SERVICES ---
   async getServices(forceRefresh: boolean = false): Promise<ServiceItem[]> {
-    if (forceRefresh) memoryCache.invalidate('services');
-    return memoryCache.dedupedFetch('services', async () => {
+    return memoryCache.swrFetch('services', async () => {
       const local = getLocal<ServiceItem[]>('ravan_services', initialServices);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('services').select('*').order('display_order').limit(100);
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const normalized = data.map((item, idx) => normalizeService(item, idx));
             setLocal('ravan_services', normalized);
             return normalized;
@@ -2133,12 +2337,12 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getServices fallback:', err);
       }
-      return (local && local.length > 0 ? local : initialServices).map((item, idx) => normalizeService(item, idx));
-    });
+      return (Array.isArray(local) && local.length > 0 ? local : initialServices).map((item, idx) => normalizeService(item, idx));
+    }, { forceRefresh });
   },
 
   async saveServices(services: ServiceItem[]): Promise<ServiceItem[]> {
-    const normalizedServices = services.map((s, idx) => normalizeService(s, idx));
+    let normalizedServices = services.map((s, idx) => normalizeService(s, idx));
 
     if (supabase) {
       // 1. Detect and purge deleted service records
@@ -2156,37 +2360,43 @@ export const dataService = {
       }
 
       // 2. Map payload cleanly to PostgreSQL schema columns
-      const rowsForDb = normalizedServices.map(mapServiceForDb);
-      const { error } = await supabase.from('services').upsert(rowsForDb);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving services:', error.message);
-        throw formatSupabaseError(error, 'services');
+      if (normalizedServices.length > 0) {
+        const rowsForDb = normalizedServices.map(mapServiceForDb);
+        const { error } = await supabase.from('services').upsert(rowsForDb);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving services:', error.message);
+          throw formatSupabaseError(error, 'services');
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = normalizedServices.map(s => s.id);
+        const { data: verified, error: verifyErr } = await supabase.from('services').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Services: ${verifyErr?.message || `Expected ${ids.length} records, found ${verified?.length || 0}`}`);
+        }
+        normalizedServices = verified.map((item, idx) => normalizeService(item, idx));
       }
     }
 
     setLocal('ravan_services', normalizedServices);
-    memoryCache.set('services', normalizedServices);
+    memoryCache.set('services', normalizedServices, true);
 
     try {
       await this.addAuditLog('UPDATE', 'SERVICES', undefined, `Updated services catalog (${normalizedServices.length} services)`);
     } catch {}
 
-    notifyDataUpdated('services');
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ravan_services_updated', { detail: normalizedServices }));
-    }
+    broadcastDataUpdated('services', normalizedServices);
     return normalizedServices;
   },
 
   // --- SOLUTIONS ---
   async getSolutions(forceRefresh: boolean = false): Promise<SolutionItem[]> {
-    if (forceRefresh) memoryCache.invalidate('solutions');
-    return memoryCache.dedupedFetch('solutions', async () => {
+    return memoryCache.swrFetch('solutions', async () => {
       const local = getLocal<SolutionItem[]>('ravan_solutions', initialSolutions);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('solutions').select('*').order('display_order').limit(100);
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const normalized = data.map((item, idx) => normalizeSolution(item, idx));
             setLocal('ravan_solutions', normalized);
             return normalized;
@@ -2195,12 +2405,12 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getSolutions fallback:', err);
       }
-      return (local && local.length > 0 ? local : initialSolutions).map((item, idx) => normalizeSolution(item, idx));
-    });
+      return (Array.isArray(local) && local.length > 0 ? local : initialSolutions).map((item, idx) => normalizeSolution(item, idx));
+    }, { forceRefresh });
   },
 
   async saveSolutions(solutions: SolutionItem[]): Promise<SolutionItem[]> {
-    const normalizedSolutions = solutions.map((s, idx) => normalizeSolution(s, idx));
+    let normalizedSolutions = solutions.map((s, idx) => normalizeSolution(s, idx));
 
     if (supabase) {
       // 1. Detect and purge deleted solution records
@@ -2218,31 +2428,38 @@ export const dataService = {
       }
 
       // 2. Map payload cleanly to PostgreSQL schema columns
-      const rowsForDb = normalizedSolutions.map(mapSolutionForDb);
-      const { error } = await supabase.from('solutions').upsert(rowsForDb);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving solutions:', error.message);
-        throw formatSupabaseError(error, 'solutions');
+      if (normalizedSolutions.length > 0) {
+        const rowsForDb = normalizedSolutions.map(mapSolutionForDb);
+        const { error } = await supabase.from('solutions').upsert(rowsForDb);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving solutions:', error.message);
+          throw formatSupabaseError(error, 'solutions');
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = normalizedSolutions.map(s => s.id);
+        const { data: verified, error: verifyErr } = await supabase.from('solutions').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Solutions: ${verifyErr?.message || `Expected ${ids.length} records, found ${verified?.length || 0}`}`);
+        }
+        normalizedSolutions = verified.map((item, idx) => normalizeSolution(item, idx));
       }
     }
 
     setLocal('ravan_solutions', normalizedSolutions);
-    memoryCache.set('solutions', normalizedSolutions);
+    memoryCache.set('solutions', normalizedSolutions, true);
 
     try {
       await this.addAuditLog('UPDATE', 'SOLUTIONS', undefined, `Updated solutions blueprints (${normalizedSolutions.length} items)`);
     } catch {}
 
-    notifyDataUpdated('solutions');
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ravan_solutions_updated', { detail: normalizedSolutions }));
-    }
+    broadcastDataUpdated('solutions', normalizedSolutions);
     return normalizedSolutions;
   },
 
   // --- PROJECTS ---
-  async getProjects(): Promise<ProjectItem[]> {
-    return memoryCache.dedupedFetch('projects', async () => {
+  async getProjects(forceRefresh: boolean = false): Promise<ProjectItem[]> {
+    return memoryCache.swrFetch('projects', async () => {
       const local = getLocal<ProjectItem[]>('ravan_projects', initialProjects);
       try {
         if (supabase) {
@@ -2255,48 +2472,72 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getProjects fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialProjects;
+    }, { forceRefresh });
   },
 
   async saveProjects(projects: ProjectItem[]): Promise<ProjectItem[]> {
     if (supabase) {
-      const { error } = await supabase.from('projects').upsert(projects);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving projects:', error.message);
-        throw formatSupabaseError(error, 'projects');
+      // Detect deleted projects
+      try {
+        const { data: existing } = await supabase.from('projects').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(projects.map(p => p.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('projects').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase projects deletion notice:', delErr);
+      }
+
+      if (projects.length > 0) {
+        const { error } = await supabase.from('projects').upsert(projects);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving projects:', error.message);
+          throw formatSupabaseError(error, 'projects');
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = projects.map(p => p.id);
+        const { data: verified, error: verifyErr } = await supabase.from('projects').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Projects: ${verifyErr?.message || `Expected ${ids.length} records, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
     setLocal('ravan_projects', projects);
-    memoryCache.set('projects', projects);
+    memoryCache.set('projects', projects, true);
 
     try {
       await this.addAuditLog('UPDATE', 'PROJECTS', undefined, `Updated case studies (${projects.length} projects)`);
     } catch {}
 
-    notifyDataUpdated('projects');
+    broadcastDataUpdated('projects', projects);
     return projects;
   },
 
   // --- HACKATHONS ---
-  async getHackathon(): Promise<HackathonItem> {
-    const list = await this.getHackathons();
-    return list.find(h => h.status !== 'draft') || list[0] || initialHackathon;
+  async getHackathon(forceRefresh: boolean = false): Promise<HackathonItem | null> {
+    const list = await this.getHackathons(forceRefresh);
+    const found = list.find(h => h.status !== 'draft') || list[0];
+    return found || null;
   },
 
-  async getHackathons(): Promise<HackathonItem[]> {
-    return memoryCache.dedupedFetch('hackathons_list', async () => {
-      const local = getLocal<HackathonItem[]>('ravan_hackathons_list', [initialHackathon]);
+  async getHackathons(forceRefresh: boolean = false): Promise<HackathonItem[]> {
+    return memoryCache.swrFetch('hackathons_list', async () => {
+      const local = getLocal<HackathonItem[]>('ravan_hackathons_list', []);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('hackathons').select('*').order('updated_at', { ascending: false });
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const mapped = data.map((d, idx) => normalizeHackathon(d, idx));
             setLocal('ravan_hackathons_list', mapped);
             if (mapped.length > 0) {
               setLocal('ravan_hackathon', mapped[0]);
-              memoryCache.set('hackathons', mapped[0]);
+              memoryCache.set('hackathons', mapped[0], true);
             }
             return mapped;
           }
@@ -2304,8 +2545,8 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getHackathons fallback:', err);
       }
-      return (Array.isArray(local) && local.length > 0) ? local.map((d, idx) => normalizeHackathon(d, idx)) : [initialHackathon];
-    });
+      return (Array.isArray(local) && local.length > 0) ? local.map((d, idx) => normalizeHackathon(d, idx)) : [];
+    }, { forceRefresh });
   },
 
   async saveHackathon(hackathon: HackathonItem): Promise<HackathonItem> {
@@ -2322,7 +2563,7 @@ export const dataService = {
   },
 
   async saveHackathons(hackathons: HackathonItem[]): Promise<HackathonItem[]> {
-    const normalizedHackathons = hackathons.map((h, idx) => normalizeHackathon(h, idx));
+    let normalizedHackathons = hackathons.map((h, idx) => normalizeHackathon(h, idx));
 
     if (supabase) {
       // 1. Detect and purge deleted hackathon records
@@ -2339,45 +2580,68 @@ export const dataService = {
         if (import.meta.env.DEV) console.warn('Supabase hackathons deletion sync notice:', delErr);
       }
 
-      // 2. Try primary modern schema upsert
-      const modernRows = normalizedHackathons.map(mapHackathonForDb);
-      const { error: modernError } = await supabase.from('hackathons').upsert(modernRows);
+      if (normalizedHackathons.length > 0) {
+        // 2. Try primary modern schema upsert
+        const modernRows = normalizedHackathons.map(mapHackathonForDb);
+        const { error: modernError } = await supabase.from('hackathons').upsert(modernRows);
 
-      if (modernError) {
-        // If modern schema columns are missing or check constraint fails, fall back to legacy schema mapping
-        const isSchemaMismatch = 
-          modernError.message.includes('schema cache') || 
-          modernError.message.toLowerCase().includes('column') ||
-          modernError.code === '42703' ||
-          modernError.code === 'PGRST204' ||
-          modernError.message.toLowerCase().includes('constraint');
+        if (modernError) {
+          // If modern schema columns are missing or check constraint fails, fall back to legacy schema mapping
+          const isSchemaMismatch = 
+            modernError.message.includes('schema cache') || 
+            modernError.message.toLowerCase().includes('column') ||
+            modernError.code === '42703' ||
+            modernError.code === 'PGRST204' ||
+            modernError.message.toLowerCase().includes('constraint');
 
-        if (isSchemaMismatch) {
-          const legacyRows = normalizedHackathons.map(mapHackathonForLegacyDb);
-          const { error: legacyError } = await supabase.from('hackathons').upsert(legacyRows);
-          if (legacyError) {
-            if (import.meta.env.DEV) console.error('Supabase legacy hackathons fallback error:', legacyError.message);
-            throw formatSupabaseError(legacyError, 'hackathons');
+          if (isSchemaMismatch) {
+            const legacyRows = normalizedHackathons.map(mapHackathonForLegacyDb);
+            const { error: legacyError } = await supabase.from('hackathons').upsert(legacyRows);
+            if (legacyError) {
+              if (import.meta.env.DEV) console.error('Supabase legacy hackathons fallback error:', legacyError.message);
+              throw formatSupabaseError(legacyError, 'hackathons');
+            }
+          } else {
+            if (import.meta.env.DEV) console.error('Supabase error saving hackathons:', modernError.message);
+            throw formatSupabaseError(modernError, 'hackathons');
           }
-        } else {
-          if (import.meta.env.DEV) console.error('Supabase error saving hackathons:', modernError.message);
-          throw formatSupabaseError(modernError, 'hackathons');
         }
+
+        // 3. CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = normalizedHackathons.map(h => h.id);
+        const { data: verifiedRows, error: verifyErr } = await supabase
+          .from('hackathons')
+          .select('*')
+          .in('id', ids);
+
+        if (verifyErr) {
+          throw new Error(`Database persistence verification failed: ${verifyErr.message}`);
+        }
+        if (!verifiedRows || verifiedRows.length !== ids.length) {
+          throw new Error(`Database persistence verification mismatch: Saved ${ids.length} records, but database confirmed ${verifiedRows ? verifiedRows.length : 0}.`);
+        }
+
+        normalizedHackathons = verifiedRows.map((r, idx) => normalizeHackathon(r, idx));
       }
     }
 
     setLocal('ravan_hackathons_list', normalizedHackathons);
     if (normalizedHackathons.length > 0) {
       setLocal('ravan_hackathon', normalizedHackathons[0]);
-      memoryCache.set('hackathons', normalizedHackathons[0]);
+      memoryCache.set('hackathons', normalizedHackathons[0], true);
+    } else {
+      try {
+        localStorage.removeItem('ravan_hackathon');
+        memoryCache.invalidateKey('hackathons');
+      } catch {}
     }
-    memoryCache.set('hackathons_list', normalizedHackathons);
+    memoryCache.set('hackathons_list', normalizedHackathons, true);
 
     try {
       await this.addAuditLog('UPDATE', 'HACKATHONS', undefined, `Updated hackathons (${normalizedHackathons.length} events)`);
     } catch {}
 
-    notifyDataUpdated('hackathons');
+    broadcastDataUpdated('hackathons', normalizedHackathons);
     return normalizedHackathons;
   },
 
@@ -2388,29 +2652,40 @@ export const dataService = {
         if (import.meta.env.DEV) console.error('Supabase error deleting hackathon:', error.message);
         throw formatSupabaseError(error, 'hackathons');
       }
+
+      // Read-back verification of deletion
+      const { data: checkDeleted } = await supabase.from('hackathons').select('id').eq('id', id);
+      if (checkDeleted && checkDeleted.length > 0) {
+        throw new Error(`Database deletion verification failed: Hackathon (${id}) still exists in database.`);
+      }
     }
-    const current = await this.getHackathons();
+    const current = await this.getHackathons(true);
     const updated = current.filter(h => h.id !== id);
     setLocal('ravan_hackathons_list', updated);
-    memoryCache.set('hackathons_list', updated);
+    memoryCache.set('hackathons_list', updated, true);
     if (updated.length > 0) {
       setLocal('ravan_hackathon', updated[0]);
-      memoryCache.set('hackathons', updated[0]);
+      memoryCache.set('hackathons', updated[0], true);
+    } else {
+      try {
+        localStorage.removeItem('ravan_hackathon');
+        memoryCache.invalidateKey('hackathons');
+      } catch {}
     }
     try {
       await this.addAuditLog('DELETE', 'HACKATHONS', id, `Deleted hackathon (${id})`);
     } catch {}
-    notifyDataUpdated('hackathons');
+    broadcastDataUpdated('hackathons', updated);
   },
 
   // --- LEARNING PROGRAMS ---
-  async getLearningPrograms(): Promise<LearningProgram[]> {
-    return memoryCache.dedupedFetch('learning', async () => {
+  async getLearningPrograms(forceRefresh: boolean = false): Promise<LearningProgram[]> {
+    return memoryCache.swrFetch('learning', async () => {
       const local = getLocal<LearningProgram[]>('ravan_learning', initialLearningPrograms);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('learning_programs').select('*').order('display_order').limit(100);
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const mapped = data.map((d, idx) => normalizeLearningProgram(d, idx));
             setLocal('ravan_learning', mapped);
             return mapped;
@@ -2420,11 +2695,11 @@ export const dataService = {
         if (import.meta.env.DEV) console.warn('Supabase getLearningPrograms fallback:', err);
       }
       return (Array.isArray(local) && local.length > 0) ? local.map((d, idx) => normalizeLearningProgram(d, idx)) : initialLearningPrograms;
-    });
+    }, { forceRefresh });
   },
 
   async saveLearningPrograms(programs: LearningProgram[]): Promise<LearningProgram[]> {
-    const normalizedPrograms = programs.map((p, idx) => normalizeLearningProgram(p, idx));
+    let normalizedPrograms = programs.map((p, idx) => normalizeLearningProgram(p, idx));
 
     if (supabase) {
       // 1. Detect and purge deleted records
@@ -2441,39 +2716,49 @@ export const dataService = {
         if (import.meta.env.DEV) console.warn('Supabase learning_programs deletion sync notice:', delErr);
       }
 
-      // 2. Try primary modern schema upsert
-      const modernRows = normalizedPrograms.map(mapLearningProgramForDb);
-      const { error: modernError } = await supabase.from('learning_programs').upsert(modernRows);
+      if (normalizedPrograms.length > 0) {
+        // 2. Try primary modern schema upsert
+        const modernRows = normalizedPrograms.map(mapLearningProgramForDb);
+        const { error: modernError } = await supabase.from('learning_programs').upsert(modernRows);
 
-      if (modernError) {
-        const isSchemaMismatch = 
-          modernError.message.includes('schema cache') || 
-          modernError.message.toLowerCase().includes('column') ||
-          modernError.code === '42703' ||
-          modernError.code === 'PGRST204';
+        if (modernError) {
+          const isSchemaMismatch = 
+            modernError.message.includes('schema cache') || 
+            modernError.message.toLowerCase().includes('column') ||
+            modernError.code === '42703' ||
+            modernError.code === 'PGRST204';
 
-        if (isSchemaMismatch) {
-          const legacyRows = normalizedPrograms.map(mapLearningProgramForLegacyDb);
-          const { error: legacyError } = await supabase.from('learning_programs').upsert(legacyRows);
-          if (legacyError) {
-            if (import.meta.env.DEV) console.error('Supabase legacy learning fallback error:', legacyError.message);
-            throw formatSupabaseError(legacyError, 'learning_programs');
+          if (isSchemaMismatch) {
+            const legacyRows = normalizedPrograms.map(mapLearningProgramForLegacyDb);
+            const { error: legacyError } = await supabase.from('learning_programs').upsert(legacyRows);
+            if (legacyError) {
+              if (import.meta.env.DEV) console.error('Supabase legacy learning fallback error:', legacyError.message);
+              throw formatSupabaseError(legacyError, 'learning_programs');
+            }
+          } else {
+            if (import.meta.env.DEV) console.error('Supabase error saving learning_programs:', modernError.message);
+            throw formatSupabaseError(modernError, 'learning_programs');
           }
-        } else {
-          if (import.meta.env.DEV) console.error('Supabase error saving learning_programs:', modernError.message);
-          throw formatSupabaseError(modernError, 'learning_programs');
         }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = normalizedPrograms.map(p => p.id);
+        const { data: verified, error: verifyErr } = await supabase.from('learning_programs').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Learning Programs: ${verifyErr?.message || `Expected ${ids.length} records, found ${verified?.length || 0}`}`);
+        }
+        normalizedPrograms = verified.map((d, idx) => normalizeLearningProgram(d, idx));
       }
     }
 
     setLocal('ravan_learning', normalizedPrograms);
-    memoryCache.set('learning', normalizedPrograms);
+    memoryCache.set('learning', normalizedPrograms, true);
 
     try {
       await this.addAuditLog('UPDATE', 'LEARNING', undefined, `Updated learning tracks (${normalizedPrograms.length} programs)`);
     } catch {}
 
-    notifyDataUpdated('learning');
+    broadcastDataUpdated('learning', normalizedPrograms);
     return normalizedPrograms;
   },
 
@@ -2485,29 +2770,28 @@ export const dataService = {
         throw formatSupabaseError(error, 'learning_programs');
       }
     }
-    const current = await this.getLearningPrograms();
+    const current = await this.getLearningPrograms(true);
     const updated = current.filter(p => p.id !== id);
     setLocal('ravan_learning', updated);
-    memoryCache.set('learning', updated);
+    memoryCache.set('learning', updated, true);
     try {
       await this.addAuditLog('DELETE', 'LEARNING', id, `Deleted learning program (${id})`);
     } catch {}
-    notifyDataUpdated('learning');
+    broadcastDataUpdated('learning', updated);
   },
 
   // --- AI & ML MODELS ---
-  async getAIMLModels(): Promise<AIMLModel[]> {
-    return memoryCache.dedupedFetch('aiml_models', async () => {
+  async getAIMLModels(forceRefresh: boolean = false): Promise<AIMLModel[]> {
+    return memoryCache.swrFetch('aiml_models', async () => {
       const local = getLocal<AIMLModel[]>('ravan_aiml_models', initialAIMLModels);
       try {
         if (supabase) {
-          // Check if stored in solutions with category 'ai_model' or dedicated table
           const { data, error } = await supabase
             .from('solutions')
             .select('*')
             .eq('category', 'ai_model')
             .order('display_order');
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             const mapped: AIMLModel[] = data.map((d: any) => ({
               id: d.id,
               name: d.title,
@@ -2530,8 +2814,8 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getAIMLModels fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialAIMLModels;
+    }, { forceRefresh });
   },
 
   async saveAIMLModels(models: AIMLModel[]): Promise<AIMLModel[]> {
@@ -2556,20 +2840,31 @@ export const dataService = {
             latency: m.latency
           }
         }));
-        await supabase.from('solutions').upsert(solutionsPayload);
+        if (solutionsPayload.length > 0) {
+          const { error } = await supabase.from('solutions').upsert(solutionsPayload);
+          if (error) {
+            throw formatSupabaseError(error, 'solutions');
+          }
+          // Read-back verification
+          const ids = solutionsPayload.map(s => s.id);
+          const { data: verified, error: verifyErr } = await supabase.from('solutions').select('*').in('id', ids);
+          if (verifyErr || !verified || verified.length !== ids.length) {
+            throw new Error(`Database verification mismatch for AI/ML Models: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+          }
+        }
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase saveAIMLModels note:', err);
       }
     }
 
     setLocal('ravan_aiml_models', models);
-    memoryCache.set('aiml_models', models);
+    memoryCache.set('aiml_models', models, true);
 
     try {
       await this.addAuditLog('UPDATE', 'AIML_MODELS', undefined, `Updated AI/ML models (${models.length} specifications)`);
     } catch {}
 
-    notifyDataUpdated('aiml_models');
+    broadcastDataUpdated('aiml_models', models);
     return models;
   },
 
@@ -2580,21 +2875,21 @@ export const dataService = {
         await supabase.from('solutions').delete().eq('id', solId);
       } catch {}
     }
-    const current = await this.getAIMLModels();
+    const current = await this.getAIMLModels(true);
     const updated = current.filter(m => m.id !== id);
     setLocal('ravan_aiml_models', updated);
-    memoryCache.set('aiml_models', updated);
-    notifyDataUpdated('aiml_models');
+    memoryCache.set('aiml_models', updated, true);
+    broadcastDataUpdated('aiml_models', updated);
   },
 
   // --- ECOSYSTEM ---
-  async getEcosystem(): Promise<EcosystemItem[]> {
-    return memoryCache.dedupedFetch('ecosystem', async () => {
+  async getEcosystem(forceRefresh: boolean = false): Promise<EcosystemItem[]> {
+    return memoryCache.swrFetch('ecosystem', async () => {
       const local = getLocal<EcosystemItem[]>('ravan_ecosystem', initialEcosystem);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('ecosystem').select('*');
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             setLocal('ravan_ecosystem', data);
             return data as EcosystemItem[];
           }
@@ -2602,27 +2897,34 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getEcosystem fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialEcosystem;
+    }, { forceRefresh });
   },
 
   async saveEcosystem(items: EcosystemItem[]): Promise<EcosystemItem[]> {
-    if (supabase) {
+    if (supabase && items.length > 0) {
       const { error } = await supabase.from('ecosystem').upsert(items);
       if (error) {
         if (import.meta.env.DEV) console.error('Supabase error saving ecosystem:', error.message);
         throw formatSupabaseError(error, 'ecosystem');
       }
+
+      // Read-back verification
+      const ids = items.map(i => i.id);
+      const { data: verified, error: verifyErr } = await supabase.from('ecosystem').select('*').in('id', ids);
+      if (verifyErr || !verified || verified.length !== ids.length) {
+        throw new Error(`Database verification mismatch for Ecosystem: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+      }
     }
 
     setLocal('ravan_ecosystem', items);
-    memoryCache.set('ecosystem', items);
+    memoryCache.set('ecosystem', items, true);
 
     try {
       await this.addAuditLog('UPDATE', 'ECOSYSTEM', undefined, 'Updated Ravan Tech Park and Film Studio specifications');
     } catch {}
 
-    notifyDataUpdated('ecosystem');
+    broadcastDataUpdated('ecosystem', items);
     return items;
   },
 
@@ -2634,21 +2936,21 @@ export const dataService = {
         throw formatSupabaseError(error, 'ecosystem');
       }
     }
-    const current = await this.getEcosystem();
+    const current = await this.getEcosystem(true);
     const updated = current.filter(e => e.id !== id);
     setLocal('ravan_ecosystem', updated);
-    memoryCache.set('ecosystem', updated);
-    notifyDataUpdated('ecosystem');
+    memoryCache.set('ecosystem', updated, true);
+    broadcastDataUpdated('ecosystem', updated);
   },
 
   // --- MEDIA ---
-  async getMedia(): Promise<MediaItem[]> {
-    return memoryCache.dedupedFetch('media', async () => {
+  async getMedia(forceRefresh: boolean = false): Promise<MediaItem[]> {
+    return memoryCache.swrFetch('media', async () => {
       const local = getLocal<MediaItem[]>('ravan_media', initialMedia);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('media').select('*').order('created_at', { ascending: false }).limit(100);
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             setLocal('ravan_media', data);
             return data as MediaItem[];
           }
@@ -2656,22 +2958,29 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getMedia fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialMedia;
+    }, { forceRefresh });
   },
 
   async saveMedia(items: MediaItem[]): Promise<MediaItem[]> {
-    if (supabase) {
+    if (supabase && items.length > 0) {
       const { error } = await supabase.from('media').upsert(items);
       if (error) {
         if (import.meta.env.DEV) console.error('Supabase error saving media:', error.message);
         throw formatSupabaseError(error, 'media');
       }
+
+      // Read-back verification
+      const ids = items.map(m => m.id);
+      const { data: verified, error: verifyErr } = await supabase.from('media').select('*').in('id', ids);
+      if (verifyErr || !verified || verified.length !== ids.length) {
+        throw new Error(`Database verification mismatch for Media: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+      }
     }
 
     setLocal('ravan_media', items);
-    memoryCache.set('media', items);
-    notifyDataUpdated('media');
+    memoryCache.set('media', items, true);
+    broadcastDataUpdated('media', items);
     return items;
   },
 
@@ -2685,7 +2994,6 @@ export const dataService = {
         if (import.meta.env.DEV) console.error('Supabase error deleting media:', error.message);
         throw formatSupabaseError(error, 'media');
       }
-      // Safe storage removal if storage_path exists and is in site-assets
       if (itemToDelete?.storage_path) {
         try {
           await supabase.storage.from('site-assets').remove([itemToDelete.storage_path]);
@@ -2695,8 +3003,8 @@ export const dataService = {
 
     const updated = current.filter(m => m.id !== id);
     setLocal('ravan_media', updated);
-    memoryCache.set('media', updated);
-    notifyDataUpdated('media');
+    memoryCache.set('media', updated, true);
+    broadcastDataUpdated('media', updated);
   },
 
   // --- CONTACT ENQUIRIES & DIRECTIVES AUTOMATION ---
@@ -2990,8 +3298,7 @@ export const dataService = {
 
   // --- SEO SETTINGS & HEALTH REPORT ---
   async getSEOSettings(forceRefresh: boolean = false): Promise<SEOSettings> {
-    if (forceRefresh) memoryCache.invalidate('seo_settings');
-    return memoryCache.dedupedFetch('seo_settings', async () => {
+    return memoryCache.swrFetch('seo_settings', async () => {
       const local = getLocal<SEOSettings>('ravan_seo', initialSEOSettings);
       try {
         if (supabase) {
@@ -3005,11 +3312,11 @@ export const dataService = {
         if (import.meta.env.DEV) console.warn('Supabase getSEOSettings fallback:', err);
       }
       return local;
-    });
+    }, { forceRefresh });
   },
 
   async updateSEOSettings(updated: Partial<SEOSettings>): Promise<SEOSettings> {
-    const current = await this.getSEOSettings();
+    const current = await this.getSEOSettings(true);
     const merged = { ...current, ...updated };
 
     if (supabase) {
@@ -3018,16 +3325,22 @@ export const dataService = {
         if (import.meta.env.DEV) console.error('Supabase error updating seo_metadata:', error.message);
         throw formatSupabaseError(error, 'seo_metadata');
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const { data: verified, error: verifyErr } = await supabase.from('seo_metadata').select('*').single();
+      if (verifyErr || !verified) {
+        throw new Error(`Database verification mismatch for SEO Metadata: ${verifyErr?.message || 'Verification query returned empty'}`);
+      }
     }
 
     setLocal('ravan_seo', merged);
-    memoryCache.set('seo_settings', merged);
+    memoryCache.set('seo_settings', merged, true);
 
     try {
       await this.addAuditLog('UPDATE', 'SEO', undefined, 'Updated search engine & OpenGraph configurations');
     } catch {}
 
-    notifyDataUpdated('seo');
+    broadcastDataUpdated('seo', merged);
     return merged;
   },
 
@@ -3058,8 +3371,8 @@ export const dataService = {
   },
 
   // --- NAVIGATION ---
-  async getNavigation(): Promise<NavigationItem[]> {
-    return memoryCache.dedupedFetch('navigation', async () => {
+  async getNavigation(forceRefresh: boolean = false): Promise<NavigationItem[]> {
+    return memoryCache.swrFetch('navigation', async () => {
       const local = getLocal<NavigationItem[]>('ravan_navigation', initialNavigation);
       try {
         if (supabase) {
@@ -3072,33 +3385,55 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getNavigation fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialNavigation;
+    }, { forceRefresh });
   },
 
   async saveNavigation(items: NavigationItem[]): Promise<NavigationItem[]> {
     if (supabase) {
-      const { error } = await supabase.from('navigation').upsert(items);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving navigation:', error.message);
-        throw formatSupabaseError(error, 'navigation');
+      try {
+        const { data: existing } = await supabase.from('navigation').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(items.map(i => i.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('navigation').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase navigation deletion sync notice:', delErr);
+      }
+
+      if (items.length > 0) {
+        const { error } = await supabase.from('navigation').upsert(items);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving navigation:', error.message);
+          throw formatSupabaseError(error, 'navigation');
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = items.map(i => i.id);
+        const { data: verified, error: verifyErr } = await supabase.from('navigation').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Navigation: ${verifyErr?.message || `Expected ${ids.length} records, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
     setLocal('ravan_navigation', items);
-    memoryCache.set('navigation', items);
+    memoryCache.set('navigation', items, true);
 
     try {
       await this.addAuditLog('UPDATE', 'NAVIGATION', undefined, `Saved navigation hierarchy (${items.length} links)`);
     } catch {}
 
-    notifyDataUpdated('navigation');
+    broadcastDataUpdated('navigation', items);
     return items;
   },
 
   // --- GALLERY ALBUMS ---
-  async getGalleryAlbums(): Promise<GalleryAlbum[]> {
-    return memoryCache.dedupedFetch('gallery', async () => {
+  async getGalleryAlbums(forceRefresh: boolean = false): Promise<GalleryAlbum[]> {
+    return memoryCache.swrFetch('gallery', async () => {
       const local = getLocal<GalleryAlbum[]>('ravan_gallery_albums', initialGalleryAlbums);
       try {
         if (supabase) {
@@ -3111,12 +3446,12 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getGalleryAlbums fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialGalleryAlbums;
+    }, { forceRefresh });
   },
 
   async saveGalleryAlbums(albums: GalleryAlbum[]): Promise<GalleryAlbum[]> {
-    if (supabase) {
+    if (supabase && albums.length > 0) {
       const { error } = await supabase.from('gallery_albums').upsert(albums);
       if (error) {
         const isTableMissing = error.message.includes('schema cache') || error.message.includes('Could not find the table');
@@ -3126,23 +3461,54 @@ export const dataService = {
           if (import.meta.env.DEV) console.error('Supabase error saving gallery_albums:', error.message);
           throw formatSupabaseError(error, 'gallery_albums');
         }
+      } else {
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = albums.map(a => a.id);
+        const { data: verified, error: verifyErr } = await supabase.from('gallery_albums').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Gallery Albums: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
     setLocal('ravan_gallery_albums', albums);
-    memoryCache.set('gallery', albums);
+    memoryCache.set('gallery', albums, true);
 
     try {
       await this.addAuditLog('UPDATE', 'GALLERY', undefined, `Saved gallery albums (${albums.length} albums)`);
     } catch {}
 
-    notifyDataUpdated('gallery');
+    broadcastDataUpdated('gallery', albums);
     return albums;
   },
 
+  async deleteGalleryAlbum(id: string): Promise<void> {
+    if (supabase) {
+      const { error } = await supabase.from('gallery_albums').delete().eq('id', id);
+      if (error) {
+        const isTableMissing = error.message.includes('schema cache') || error.message.includes('Could not find the table');
+        if (!isTableMissing) {
+          if (import.meta.env.DEV) console.error('Supabase error deleting gallery album:', error.message);
+          throw formatSupabaseError(error, 'gallery_albums');
+        }
+      }
+    }
+
+    const current = await this.getGalleryAlbums(true);
+    const updated = current.filter(a => a.id !== id);
+    setLocal('ravan_gallery_albums', updated);
+    memoryCache.set('gallery', updated, true);
+
+    try {
+      await this.addAuditLog('DELETE', 'GALLERY', id, 'Deleted gallery album');
+    } catch {}
+
+    broadcastDataUpdated('gallery', updated);
+  },
+
   // --- BLOG POSTS ---
-  async getBlogPosts(): Promise<BlogPost[]> {
-    return memoryCache.dedupedFetch('blog', async () => {
+  async getBlogPosts(forceRefresh: boolean = false): Promise<BlogPost[]> {
+    return memoryCache.swrFetch('blog', async () => {
       const local = getLocal<BlogPost[]>('ravan_blog_posts', initialBlogPosts);
       try {
         if (supabase) {
@@ -3155,27 +3521,34 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getBlogPosts fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialBlogPosts;
+    }, { forceRefresh });
   },
 
   async saveBlogPosts(posts: BlogPost[]): Promise<BlogPost[]> {
-    if (supabase) {
+    if (supabase && posts.length > 0) {
       const { error } = await supabase.from('blog_posts').upsert(posts);
       if (error) {
         if (import.meta.env.DEV) console.error('Supabase error saving blog_posts:', error.message);
         throw formatSupabaseError(error, 'blog_posts');
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const ids = posts.map(p => p.id);
+      const { data: verified, error: verifyErr } = await supabase.from('blog_posts').select('*').in('id', ids);
+      if (verifyErr || !verified || verified.length !== ids.length) {
+        throw new Error(`Database verification mismatch for Blog Posts: ${verifyErr?.message || `Expected ${ids.length} posts, found ${verified?.length || 0}`}`);
+      }
     }
 
     setLocal('ravan_blog_posts', posts);
-    memoryCache.set('blog', posts);
+    memoryCache.set('blog', posts, true);
 
     try {
       await this.addAuditLog('UPDATE', 'BLOG', undefined, `Saved engineering whitepapers (${posts.length} articles)`);
     } catch {}
 
-    notifyDataUpdated('blog');
+    broadcastDataUpdated('blog', posts);
     return posts;
   },
 
@@ -3187,21 +3560,21 @@ export const dataService = {
         throw formatSupabaseError(error, 'blog_posts');
       }
     }
-    const current = await this.getBlogPosts();
+    const current = await this.getBlogPosts(true);
     const updated = current.filter(p => p.id !== id);
     setLocal('ravan_blog_posts', updated);
-    memoryCache.set('blog', updated);
-    notifyDataUpdated('blog');
+    memoryCache.set('blog', updated, true);
+    broadcastDataUpdated('blog', updated);
   },
 
   // --- EVENTS ---
-  async getEvents(): Promise<EventItem[]> {
-    return memoryCache.dedupedFetch('events', async () => {
+  async getEvents(forceRefresh: boolean = false): Promise<EventItem[]> {
+    return memoryCache.swrFetch('events', async () => {
       const local = getLocal<EventItem[]>('ravan_events', initialEvents);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('events').select('*').order('event_date', { ascending: true }).limit(50);
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             setLocal('ravan_events', data);
             return data as EventItem[];
           }
@@ -3209,27 +3582,34 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getEvents fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialEvents;
+    }, { forceRefresh });
   },
 
   async saveEvents(events: EventItem[]): Promise<EventItem[]> {
-    if (supabase) {
+    if (supabase && events.length > 0) {
       const { error } = await supabase.from('events').upsert(events);
       if (error) {
         if (import.meta.env.DEV) console.error('Supabase error saving events:', error.message);
         throw formatSupabaseError(error, 'events');
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const ids = events.map(e => e.id);
+      const { data: verified, error: verifyErr } = await supabase.from('events').select('*').in('id', ids);
+      if (verifyErr || !verified || verified.length !== ids.length) {
+        throw new Error(`Database verification mismatch for Events: ${verifyErr?.message || `Expected ${ids.length} events, found ${verified?.length || 0}`}`);
+      }
     }
 
     setLocal('ravan_events', events);
-    memoryCache.set('events', events);
+    memoryCache.set('events', events, true);
 
     try {
       await this.addAuditLog('UPDATE', 'EVENTS', undefined, `Updated summits & events (${events.length} items)`);
     } catch {}
 
-    notifyDataUpdated('events');
+    broadcastDataUpdated('events', events);
     return events;
   },
 
@@ -3241,21 +3621,21 @@ export const dataService = {
         throw formatSupabaseError(error, 'events');
       }
     }
-    const current = await this.getEvents();
+    const current = await this.getEvents(true);
     const updated = current.filter(e => e.id !== id);
     setLocal('ravan_events', updated);
-    memoryCache.set('events', updated);
-    notifyDataUpdated('events');
+    memoryCache.set('events', updated, true);
+    broadcastDataUpdated('events', updated);
   },
 
   // --- TESTIMONIALS ---
-  async getTestimonials(): Promise<TestimonialItem[]> {
-    return memoryCache.dedupedFetch('testimonials', async () => {
+  async getTestimonials(forceRefresh: boolean = false): Promise<TestimonialItem[]> {
+    return memoryCache.swrFetch('testimonials', async () => {
       const local = getLocal<TestimonialItem[]>('ravan_testimonials', initialTestimonials);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('testimonials').select('*').order('display_order').limit(100);
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             setLocal('ravan_testimonials', data);
             return data as TestimonialItem[];
           }
@@ -3263,27 +3643,34 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getTestimonials fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialTestimonials;
+    }, { forceRefresh });
   },
 
   async saveTestimonials(items: TestimonialItem[]): Promise<TestimonialItem[]> {
-    if (supabase) {
+    if (supabase && items.length > 0) {
       const { error } = await supabase.from('testimonials').upsert(items);
       if (error) {
         if (import.meta.env.DEV) console.error('Supabase error saving testimonials:', error.message);
         throw formatSupabaseError(error, 'testimonials');
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const ids = items.map(t => t.id);
+      const { data: verified, error: verifyErr } = await supabase.from('testimonials').select('*').in('id', ids);
+      if (verifyErr || !verified || verified.length !== ids.length) {
+        throw new Error(`Database verification mismatch for Testimonials: ${verifyErr?.message || `Expected ${ids.length} items, found ${verified?.length || 0}`}`);
+      }
     }
 
     setLocal('ravan_testimonials', items);
-    memoryCache.set('testimonials', items);
+    memoryCache.set('testimonials', items, true);
 
     try {
       await this.addAuditLog('UPDATE', 'TESTIMONIALS', undefined, `Updated client endorsements (${items.length} items)`);
     } catch {}
 
-    notifyDataUpdated('testimonials');
+    broadcastDataUpdated('testimonials', items);
     return items;
   },
 
@@ -3295,21 +3682,21 @@ export const dataService = {
         throw formatSupabaseError(error, 'testimonials');
       }
     }
-    const current = await this.getTestimonials();
+    const current = await this.getTestimonials(true);
     const updated = current.filter(t => t.id !== id);
     setLocal('ravan_testimonials', updated);
-    memoryCache.set('testimonials', updated);
-    notifyDataUpdated('testimonials');
+    memoryCache.set('testimonials', updated, true);
+    broadcastDataUpdated('testimonials', updated);
   },
 
   // --- PARTNERS & CLIENTS ---
-  async getPartners(): Promise<PartnerItem[]> {
-    return memoryCache.dedupedFetch('partners', async () => {
+  async getPartners(forceRefresh: boolean = false): Promise<PartnerItem[]> {
+    return memoryCache.swrFetch('partners', async () => {
       const local = getLocal<PartnerItem[]>('ravan_partners', initialPartners);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('partners').select('*').order('display_order');
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             setLocal('ravan_partners', data);
             return data as PartnerItem[];
           }
@@ -3317,12 +3704,12 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getPartners fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialPartners;
+    }, { forceRefresh });
   },
 
   async savePartners(items: PartnerItem[]): Promise<PartnerItem[]> {
-    if (supabase) {
+    if (supabase && items.length > 0) {
       const { error } = await supabase.from('partners').upsert(items);
       if (error) {
         // Fallback with core columns if status/description are omitted in DB schema
@@ -3335,17 +3722,25 @@ export const dataService = {
             category: p.category,
             display_order: p.display_order
           }));
-          await supabase.from('partners').upsert(coreItems);
-        } catch (coreErr) {
+          const { error: coreErr } = await supabase.from('partners').upsert(coreItems);
+          if (coreErr) throw formatSupabaseError(coreErr, 'partners');
+        } catch (coreErr: any) {
           if (import.meta.env.DEV) console.error('Supabase error saving partners:', error.message);
           throw formatSupabaseError(error, 'partners');
         }
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const ids = items.map(p => p.id);
+      const { data: verified, error: verifyErr } = await supabase.from('partners').select('*').in('id', ids);
+      if (verifyErr || !verified || verified.length !== ids.length) {
+        throw new Error(`Database verification mismatch for Partners: ${verifyErr?.message || `Expected ${ids.length} partners, found ${verified?.length || 0}`}`);
+      }
     }
 
     setLocal('ravan_partners', items);
-    memoryCache.set('partners', items);
-    notifyDataUpdated('partners');
+    memoryCache.set('partners', items, true);
+    broadcastDataUpdated('partners', items);
     return items;
   },
 
@@ -3357,20 +3752,20 @@ export const dataService = {
         throw formatSupabaseError(error, 'partners');
       }
     }
-    const current = await this.getPartners();
+    const current = await this.getPartners(true);
     const updated = current.filter(p => p.id !== id);
     setLocal('ravan_partners', updated);
-    memoryCache.set('partners', updated);
-    notifyDataUpdated('partners');
+    memoryCache.set('partners', updated, true);
+    broadcastDataUpdated('partners', updated);
   },
 
-  async getClients(): Promise<ClientItem[]> {
-    return memoryCache.dedupedFetch('clients', async () => {
+  async getClients(forceRefresh: boolean = false): Promise<ClientItem[]> {
+    return memoryCache.swrFetch('clients', async () => {
       const local = getLocal<ClientItem[]>('ravan_clients', initialClients);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('clients').select('*').order('display_order');
-          if (!error && Array.isArray(data) && data.length > 0) {
+          if (!error && Array.isArray(data)) {
             setLocal('ravan_clients', data);
             return data as ClientItem[];
           }
@@ -3378,15 +3773,14 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getClients fallback:', err);
       }
-      return local;
-    });
+      return Array.isArray(local) && local.length > 0 ? local : initialClients;
+    }, { forceRefresh });
   },
 
   async saveClients(items: ClientItem[]): Promise<ClientItem[]> {
-    if (supabase) {
+    if (supabase && items.length > 0) {
       const { error } = await supabase.from('clients').upsert(items);
       if (error) {
-        // Fallback with core columns verified on live PostgreSQL schema
         try {
           const coreItems = items.map(c => ({
             id: c.id,
@@ -3395,17 +3789,25 @@ export const dataService = {
             display_order: typeof c.display_order === 'number' ? c.display_order : 0,
             is_active: c.status !== 'draft'
           }));
-          await supabase.from('clients').upsert(coreItems);
-        } catch (coreErr) {
+          const { error: coreErr } = await supabase.from('clients').upsert(coreItems);
+          if (coreErr) throw formatSupabaseError(coreErr, 'clients');
+        } catch (coreErr: any) {
           if (import.meta.env.DEV) console.error('Supabase error saving clients:', error.message);
           throw formatSupabaseError(error, 'clients');
         }
       }
+
+      // CONFIRMED DATABASE READ-BACK VERIFICATION
+      const ids = items.map(c => c.id);
+      const { data: verified, error: verifyErr } = await supabase.from('clients').select('*').in('id', ids);
+      if (verifyErr || !verified || verified.length !== ids.length) {
+        throw new Error(`Database verification mismatch for Clients: ${verifyErr?.message || `Expected ${ids.length} clients, found ${verified?.length || 0}`}`);
+      }
     }
 
     setLocal('ravan_clients', items);
-    memoryCache.set('clients', items);
-    notifyDataUpdated('clients');
+    memoryCache.set('clients', items, true);
+    broadcastDataUpdated('clients', items);
     return items;
   },
 
@@ -3417,11 +3819,11 @@ export const dataService = {
         throw formatSupabaseError(error, 'clients');
       }
     }
-    const current = await this.getClients();
+    const current = await this.getClients(true);
     const updated = current.filter(c => c.id !== id);
     setLocal('ravan_clients', updated);
-    memoryCache.set('clients', updated);
-    notifyDataUpdated('clients');
+    memoryCache.set('clients', updated, true);
+    broadcastDataUpdated('clients', updated);
   },
 
   // --- ROLES & PERMISSIONS ---
@@ -3494,15 +3896,15 @@ export const dataService = {
       }
     }
 
-    const current = await this.getFounders();
+    const current = await this.getFounders(true);
     const updated = current.filter(f => f.id !== id);
     setLocal('ravan_founders', updated);
     if (updated.length > 0) {
       setLocal('ravan_founder', updated[0]);
     }
-    memoryCache.set('founders', updated);
+    memoryCache.set('founders', updated, true);
     if (updated.length > 0) {
-      memoryCache.set('founder', updated[0]);
+      memoryCache.set('founder', updated[0], true);
     }
 
     if (typeof window !== 'undefined') {
@@ -3516,7 +3918,7 @@ export const dataService = {
       await this.addAuditLog('DELETE', 'FOUNDERS', id, 'Deleted Founder record');
     } catch {}
 
-    notifyDataUpdated('founder');
+    broadcastDataUpdated('founders', updated);
   },
 
   async deleteLeadership(id: string): Promise<void> {
@@ -3528,16 +3930,16 @@ export const dataService = {
       }
     }
 
-    const current = await this.getLeadership();
+    const current = await this.getLeadership(true);
     const updated = current.filter(m => m.id !== id);
     setLocal('ravan_leadership', updated);
-    memoryCache.set('leadership', updated);
+    memoryCache.set('leadership', updated, true);
 
     try {
       await this.addAuditLog('DELETE', 'LEADERSHIP', id, 'Deleted leadership member record');
     } catch {}
 
-    notifyDataUpdated('leadership');
+    broadcastDataUpdated('leadership', updated);
   },
 
   async deleteService(id: string): Promise<void> {
@@ -3549,16 +3951,16 @@ export const dataService = {
       }
     }
 
-    const current = await this.getServices();
+    const current = await this.getServices(true);
     const updated = current.filter(s => s.id !== id);
     setLocal('ravan_services', updated);
-    memoryCache.set('services', updated);
+    memoryCache.set('services', updated, true);
 
     try {
       await this.addAuditLog('DELETE', 'SERVICES', id, 'Deleted service offering');
     } catch {}
 
-    notifyDataUpdated('services');
+    broadcastDataUpdated('services', updated);
   },
 
   async deleteSolution(id: string): Promise<void> {
@@ -3570,16 +3972,16 @@ export const dataService = {
       }
     }
 
-    const current = await this.getSolutions();
+    const current = await this.getSolutions(true);
     const updated = current.filter(s => s.id !== id);
     setLocal('ravan_solutions', updated);
-    memoryCache.set('solutions', updated);
+    memoryCache.set('solutions', updated, true);
 
     try {
       await this.addAuditLog('DELETE', 'SOLUTIONS', id, 'Deleted solution blueprint');
     } catch {}
 
-    notifyDataUpdated('solutions');
+    broadcastDataUpdated('solutions', updated);
   },
 
   async deleteProject(id: string): Promise<void> {
@@ -3591,40 +3993,16 @@ export const dataService = {
       }
     }
 
-    const current = await this.getProjects();
+    const current = await this.getProjects(true);
     const updated = current.filter(p => p.id !== id);
     setLocal('ravan_projects', updated);
-    memoryCache.set('projects', updated);
+    memoryCache.set('projects', updated, true);
 
     try {
       await this.addAuditLog('DELETE', 'PROJECTS', id, 'Deleted case study project');
     } catch {}
 
-    notifyDataUpdated('projects');
-  },
-
-  async deleteGalleryAlbum(id: string): Promise<void> {
-    if (supabase) {
-      const { error } = await supabase.from('gallery_albums').delete().eq('id', id);
-      if (error) {
-        const isTableMissing = error.message.includes('schema cache') || error.message.includes('Could not find the table');
-        if (!isTableMissing) {
-          if (import.meta.env.DEV) console.error('Supabase error deleting gallery album:', error.message);
-          throw formatSupabaseError(error, 'gallery_albums');
-        }
-      }
-    }
-
-    const current = await this.getGalleryAlbums();
-    const updated = current.filter(a => a.id !== id);
-    setLocal('ravan_gallery_albums', updated);
-    memoryCache.set('gallery', updated);
-
-    try {
-      await this.addAuditLog('DELETE', 'GALLERY', id, 'Deleted gallery album');
-    } catch {}
-
-    notifyDataUpdated('gallery');
+    broadcastDataUpdated('projects', updated);
   },
 
 
@@ -3640,13 +4018,13 @@ export const dataService = {
     const current = await this.getEnquiries();
     const updated = current.filter(e => e.id !== id);
     setLocal('ravan_enquiries', updated);
-    memoryCache.set('enquiries', updated);
+    memoryCache.set('enquiries', updated, true);
 
     try {
       await this.addAuditLog('DELETE', 'ENQUIRIES', id, 'Deleted inquiry message');
     } catch {}
 
-    notifyDataUpdated('enquiries');
+    broadcastDataUpdated('enquiries', updated);
   },
 
   // --- USER PROFILES & RBAC ---

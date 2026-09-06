@@ -42,7 +42,7 @@ export const AdminDashboard: React.FC = () => {
       setStats({
         projectsCount: projects.length,
         servicesCount: services.length,
-        hackathonTitle: hackathon.title,
+        hackathonTitle: hackathon?.title || 'No Active Hackathon',
         leadershipCount: leadership.length + 1, // + Founder
         mediaCount: media.length,
         enquiriesCount: enquiries.length,

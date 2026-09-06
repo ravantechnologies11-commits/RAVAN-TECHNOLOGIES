@@ -55,8 +55,12 @@ export const AdminHackathons: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    window.addEventListener('ravan_data_updated', loadData);
-    return () => window.removeEventListener('ravan_data_updated', loadData);
+    const unsubscribe = dataService.subscribeToUpdates((entity) => {
+      if (!entity || entity.includes('hackathon')) {
+        loadData();
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleOpenCreate = () => {
