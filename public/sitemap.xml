@@ -1,78 +1,98 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://ravantechnologies.com/</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/about</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/about</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/founder</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/team/v-abishek</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/services</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/team/berry-sugandh-surya</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/solutions</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/team/sibi-raj-u</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/hackathons</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/team/vinothkumar</loc>
+    <lastmod>2026-09-08</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ravantechnologies.in/team/mithra-s</loc>
+    <lastmod>2026-09-08</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ravantechnologies.in/team</loc>
+    <lastmod>2026-09-08</lastmod>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://ravantechnologies.in/services</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/learning</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/solutions</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/projects</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/hackathons</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/ecosystem</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/learning</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/team</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/ai-ml</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/team/sibi-raj-u</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/projects</loc>
+    <lastmod>2026-09-08</lastmod>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://ravantechnologies.in/ecosystem</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/contact</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/contact</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/gallery</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/gallery</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/blog</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/blog</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://ravantechnologies.com/events</loc>
-    <lastmod>2026-09-04</lastmod>
+    <loc>https://ravantechnologies.in/events</loc>
+    <lastmod>2026-09-08</lastmod>
     <priority>0.8</priority>
   </url>
 </urlset>

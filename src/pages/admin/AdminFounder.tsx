@@ -1676,7 +1676,7 @@ export const AdminFounder: React.FC = () => {
                                     setFounders(copy);
                                     markChanged();
                                   }}
-                                  placeholder="founder@ravantechnologies.com"
+                                  placeholder="ravantechnologies11@gmail.com"
                                   className="w-full bg-transparent text-white text-xs focus:outline-none"
                                 />
                                 {f.public_email && (

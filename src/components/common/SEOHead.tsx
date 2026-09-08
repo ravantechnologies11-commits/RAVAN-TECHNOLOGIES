@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { updateDocumentFavicon, useBrandLogo } from '../../hooks/useBrandLogo';
 import { buildCanonicalUrl, buildPageJsonLdGraph, PRODUCTION_DOMAIN } from '../../lib/seoService';
 import { dataService } from '../../lib/dataService';
-import { Founder } from '../../types';
+import { Founder, LeadershipMember } from '../../types';
 
 interface SEOHeadProps {
   title?: string;
@@ -16,6 +16,7 @@ interface SEOHeadProps {
   mainEntity?: Record<string, any>;
   additionalEntities?: Record<string, any>[];
   customSchema?: Record<string, any>;
+  coFounder?: LeadershipMember | null;
 }
 
 export const SEOHead: React.FC<SEOHeadProps> = ({ 
@@ -29,22 +30,48 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
   breadcrumbs,
   mainEntity,
   additionalEntities,
-  customSchema
+  customSchema,
+  coFounder: propCoFounder
 }) => {
   const { site, logoUrl, siteName, tagline } = useBrandLogo();
   const [founder, setFounder] = useState<Founder | null>(() => dataService.getFounderSync());
+  const [teamMembers, setTeamMembers] = useState<LeadershipMember[]>(() => dataService.getLeadershipSync());
+  const [coFounder, setCoFounder] = useState<LeadershipMember | null>(() => {
+    if (propCoFounder) return propCoFounder;
+    const leads = dataService.getLeadershipSync();
+    return leads.find(l => l.id === 'lead-001' || l.designation?.toLowerCase().includes('co-founder')) || null;
+  });
   const [seo, setSeo] = useState<any | null>(() => dataService.getSEOSettingsSync());
 
-  // Load authoritative Founder profile and SEO settings from database
+  // Load authoritative Founder profile, Leadership (Co-Founder & Team), and SEO settings from database
   useEffect(() => {
     let isMounted = true;
     dataService.getFounder().then(f => { if (isMounted && f) setFounder(f); }).catch(() => {});
     dataService.getSEOSettings().then(s => { if (isMounted && s) setSeo(s); }).catch(() => {});
+    
+    dataService.getLeadership().then(leads => {
+      if (isMounted && leads) {
+        setTeamMembers(leads);
+        if (!propCoFounder) {
+          const cf = leads.find(l => l.id === 'lead-001' || l.designation?.toLowerCase().includes('co-founder')) || null;
+          if (cf) setCoFounder(cf);
+        }
+      }
+    }).catch(() => {});
 
     const handleUpdate = (e: any) => {
-      if (!e.detail || e.detail.key === 'seo' || e.detail.key === 'site_settings' || e.detail.key === 'founder') {
+      if (!e.detail || e.detail.key === 'seo' || e.detail.key === 'site_settings' || e.detail.key === 'founder' || e.detail.key === 'leadership') {
         dataService.getSEOSettings(true).then(s => { if (isMounted) setSeo(s); }).catch(() => {});
         dataService.getFounder(true).then(f => { if (isMounted) setFounder(f); }).catch(() => {});
+        dataService.getLeadership(true).then(leads => {
+          if (isMounted && leads) {
+            setTeamMembers(leads);
+            if (!propCoFounder) {
+              const cf = leads.find(l => l.id === 'lead-001' || l.designation?.toLowerCase().includes('co-founder')) || null;
+              if (cf) setCoFounder(cf);
+            }
+          }
+        }).catch(() => {});
       }
     };
     window.addEventListener('ravan_data_updated', handleUpdate);
@@ -52,9 +79,9 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
       isMounted = false;
       window.removeEventListener('ravan_data_updated', handleUpdate);
     };
-  }, []);
+  }, [propCoFounder]);
 
-  const cleanCanonical = canonical ? (canonical.startsWith('http') ? canonical : buildCanonicalUrl(canonical)) : PRODUCTION_DOMAIN;
+  const cleanCanonical = canonical ? (canonical.startsWith('http') ? buildCanonicalUrl(canonical) : buildCanonicalUrl(canonical)) : PRODUCTION_DOMAIN;
   const finalTitle = title || seo?.meta_title || `${siteName || 'Ravan Technologies'} — ${tagline || 'Building Technology. Solving Real Problems.'}`;
   const finalDescription = description || seo?.meta_description || site?.description || tagline || 'Engineering sovereign digital infrastructure and enterprise AI.';
   const rawImage = ogImage || seo?.og_image || logoUrl || '/images/ravan-logo.png';
@@ -79,7 +106,7 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
     }
     metaDesc.setAttribute('content', finalDescription);
 
-    // 4. Canonical Tag
+    // 4. Canonical Tag (Strictly ravantechnologies.in)
     let canonicalTag = document.querySelector('link[rel="canonical"]');
     if (!canonicalTag) {
       canonicalTag = document.createElement('link');
@@ -147,12 +174,16 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
 
     const jsonLdGraph = customSchema || buildPageJsonLdGraph({
       site,
+      seo,
       founder,
+      coFounder,
+      teamMembers,
       currentPath: cleanCanonical.replace(PRODUCTION_DOMAIN, '') || '/',
       pageTitle: finalTitle,
       pageDescription: finalDescription,
       breadcrumbs,
       mainEntity,
+      isProfilePage: ogType === 'profile',
       additionalEntities
     });
 
@@ -171,7 +202,10 @@ export const SEOHead: React.FC<SEOHeadProps> = ({
     siteName, 
     site, 
     founder, 
-    finalFavicon
+    coFounder,
+    teamMembers,
+    finalFavicon,
+    seo
   ]);
 
   return null;

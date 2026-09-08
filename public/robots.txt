@@ -9,4 +9,4 @@ User-agent: Googlebot-Image
 Allow: /
 Allow: /images/
 
-Sitemap: https://ravantechnologies.com/sitemap.xml
+Sitemap: https://ravantechnologies.in/sitemap.xml

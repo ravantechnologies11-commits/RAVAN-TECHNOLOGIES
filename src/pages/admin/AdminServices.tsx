@@ -1054,7 +1054,7 @@ export const AdminServices: React.FC = () => {
                               {srv.seo_title || `${srv.title} — Services | Ravan Technologies`}
                             </div>
                             <div className="text-emerald-400 text-xs font-mono truncate">
-                              https://ravantechnologies.com/services#{srv.slug}
+                              https://ravantechnologies.in/services#{srv.slug}
                             </div>
                             <div className="text-slate-400 text-xs mt-1 line-clamp-2 leading-relaxed">
                               {srv.seo_description || srv.short_description || 'Enterprise sovereign software architecture...'}

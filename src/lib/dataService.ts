@@ -597,6 +597,22 @@ export function parseStructuredSkills(rawSkills: any, legacySkills: any, memberI
   return results;
 }
 
+export const LEGACY_SLUG_MAP: Record<string, string> = {
+  'elena-rostova': 'berry-sugandh-surya',
+  'a-berry-sugandh-surya': 'berry-sugandh-surya',
+  'dr-marcus-vance': 'vinothkumar',
+  'v-vinothkumar': 'vinothkumar',
+  'aria-chen': 'mithra-s',
+  'abishek': 'v-abishek'
+};
+
+export const CANONICAL_LEADERSHIP_SLUGS_BY_ID: Record<string, string> = {
+  'lead-001': 'berry-sugandh-surya',
+  'lead-002': 'sibi-raj-u',
+  'lead-003': 'vinothkumar',
+  'lead-004': 'mithra-s'
+};
+
 function normalizeLeadershipMember(m: any): LeadershipMember {
   const meta = m?.social_links?._meta || {};
   const memberId = m.id || 'mem';
@@ -605,6 +621,17 @@ function normalizeLeadershipMember(m: any): LeadershipMember {
   const projects = parseStructuredProjects(m.projects || meta.projects, m.major_projects || meta.major_projects, memberId);
   const experience_records = parseStructuredExperience(m.experience_records || meta.experience_records, { ...m, id: memberId });
   const structured_skills = parseStructuredSkills(m.structured_skills || meta.structured_skills, m.skills || meta.skills, memberId);
+
+  let memberSlug = m.slug || meta.slug;
+  if (m.id && CANONICAL_LEADERSHIP_SLUGS_BY_ID[m.id]) {
+    memberSlug = CANONICAL_LEADERSHIP_SLUGS_BY_ID[m.id];
+  } else if (memberSlug && LEGACY_SLUG_MAP[memberSlug.toLowerCase()]) {
+    memberSlug = LEGACY_SLUG_MAP[memberSlug.toLowerCase()];
+  } else if (!memberSlug) {
+    memberSlug = generateSlug(m.name || '');
+  }
+
+  const canonicalPath = `/team/${memberSlug}`;
 
   return {
     id: m.id,
@@ -615,7 +642,7 @@ function normalizeLeadershipMember(m: any): LeadershipMember {
     image_url: m.image_url || '',
     display_order: typeof m.display_order === 'number' ? m.display_order : 0,
     status: m.status || 'published',
-    slug: m.slug || meta.slug || generateSlug(m.name || ''),
+    slug: memberSlug,
     short_intro: m.short_intro ?? meta.short_intro ?? '',
 
     // Structured Corporate Profile Data
@@ -999,7 +1026,7 @@ export function normalizeHackathon(raw: any, idx: number = 0): HackathonItem {
   const cleanEventDate = raw.event_date || meta.event_date || raw.event_dates || 'November 15-17, 2026';
   const cleanTime = raw.time || meta.time || '09:00 AM - 06:00 PM IST';
   const cleanLocation = raw.location || meta.location || 'Ravan Tech Park, Thiruvannamalai & Virtual';
-  const cleanRegUrl = raw.registration_url || meta.registration_url || 'https://ravantechnologies.com/hackathons/register';
+  const cleanRegUrl = raw.registration_url || meta.registration_url || 'https://ravantechnologies.in/hackathons/register';
 
   // Status mapping
   let status: 'upcoming' | 'live' | 'completed' | 'draft' = 'upcoming';
@@ -1070,7 +1097,7 @@ export function normalizeHackathon(raw: any, idx: number = 0): HackathonItem {
   }
 
   const eligibility = raw.eligibility || meta.eligibility || 'Open to engineering students, senior developers, and independent researchers worldwide.';
-  const contactInfo = raw.contact_info || meta.contact_info || 'hackathons@ravantechnologies.com';
+  const contactInfo = raw.contact_info || meta.contact_info || 'ravantechnologies11@gmail.com';
   const displayOrder = typeof raw.display_order === 'number' ? raw.display_order : (typeof meta.display_order === 'number' ? meta.display_order : idx + 1);
   const winningSolutions: WinningSolution[] = Array.isArray(raw.winning_solutions) ? raw.winning_solutions : (Array.isArray(meta.winning_solutions) ? meta.winning_solutions : []);
 
@@ -1601,8 +1628,11 @@ export const dataService = {
 
   getLeadershipMemberBySlugSync(slug: string): LeadershipMember | null {
     const members = this.getLeadershipSync();
-    const cleanSlug = (slug || '').toLowerCase().trim();
+    let cleanSlug = (slug || '').toLowerCase().trim();
     if (!cleanSlug) return null;
+    if (LEGACY_SLUG_MAP[cleanSlug]) {
+      cleanSlug = LEGACY_SLUG_MAP[cleanSlug];
+    }
 
     const found = members.find(m => {
       if (m.status !== 'published') return false;
@@ -1709,9 +1739,9 @@ export const dataService = {
 
   getAIMLModelsSync(): AIMLModel[] {
     const cached = memoryCache.get<AIMLModel[]>('aiml_models');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<AIMLModel[]>('ravan_aiml_models', initialAIMLModels);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialAIMLModels;
+    if (cached && Array.isArray(cached)) return cached;
+    const local = getLocal<AIMLModel[]>('ravan_aiml_models', []);
+    const result = (Array.isArray(local) && local.length > 0) ? local : [];
     memoryCache.set('aiml_models', result);
     return result;
   },
@@ -2206,8 +2236,11 @@ export const dataService = {
 
   async getLeadershipMemberBySlug(slug: string): Promise<LeadershipMember | null> {
     const members = await this.getLeadership();
-    const cleanSlug = (slug || '').toLowerCase().trim();
+    let cleanSlug = (slug || '').toLowerCase().trim();
     if (!cleanSlug) return null;
+    if (LEGACY_SLUG_MAP[cleanSlug]) {
+      cleanSlug = LEGACY_SLUG_MAP[cleanSlug];
+    }
 
     const found = members.find(m => {
       if (m.status !== 'published') return false;
@@ -2783,7 +2816,7 @@ export const dataService = {
   // --- AI & ML MODELS ---
   async getAIMLModels(forceRefresh: boolean = false): Promise<AIMLModel[]> {
     return memoryCache.swrFetch('aiml_models', async () => {
-      const local = getLocal<AIMLModel[]>('ravan_aiml_models', initialAIMLModels);
+      const local = getLocal<AIMLModel[]>('ravan_aiml_models', []);
       try {
         if (supabase) {
           const { data, error } = await supabase
@@ -2814,7 +2847,7 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getAIMLModels fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialAIMLModels;
+      return Array.isArray(local) ? local : [];
     }, { forceRefresh });
   },
 

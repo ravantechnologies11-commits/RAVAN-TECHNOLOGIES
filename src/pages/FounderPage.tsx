@@ -35,7 +35,7 @@ export const FounderPage: React.FC = () => {
         <SEOHead 
           title="Executive Leadership & Founder — Ravan Technologies"
           description="Architecting sovereign digital infrastructure and enterprise AI at Ravan Technologies."
-          canonical="/founder"
+          canonical="/team/v-abishek"
           breadcrumbs={[
             { name: 'Home', path: '/' },
             { name: 'Founder Address', path: '/founder' }
@@ -107,10 +107,11 @@ export const FounderPage: React.FC = () => {
         description={founder.seo_description || founder.vision || founder.short_intro || founder.bio || 'Architecting sovereign digital infrastructure and enterprise AI at Ravan Technologies.'}
         ogImage={founder.og_image || founder.image_url}
         ogType="profile"
-        canonical={founder.canonical_url || '/founder'}
+        canonical="/team/v-abishek"
         breadcrumbs={[
           { name: 'Home', path: '/' },
-          { name: 'Founder Address', path: '/founder' }
+          { name: 'Founder Address', path: '/founder' },
+          { name: founder.name, path: '/team/v-abishek' }
         ]}
         mainEntity={buildFounderPersonSchema(founder)}
       />

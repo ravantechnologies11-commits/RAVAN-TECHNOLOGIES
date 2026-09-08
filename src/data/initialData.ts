@@ -60,11 +60,11 @@ export const initialFounder: Founder = {
   projects: [],
   experience_records: [],
   structured_skills: [],
-  public_email: 'founder@ravantechnologies.com',
+  public_email: 'ravantechnologies11@gmail.com',
   social_links: {
-    linkedin: 'https://linkedin.com/company/ravantechnologies',
-    twitter: 'https://twitter.com/ravantech',
-    email: 'founder@ravantechnologies.com'
+    linkedin: 'https://www.linkedin.com/in/abishek-v-a984a6382?utm_source=share_via&utm_content=profile&utm_medium=member_android',
+    instagram: 'https://www.instagram.com/abishek_creator_/?hl=en',
+    email: 'ravantechnologies11@gmail.com'
   },
   seo_title: 'V ABISHEK — Founder & Architect | Ravan Technologies',
   seo_description: 'Discover the visionary leadership and engineering philosophy behind Ravan Technologies.',
@@ -82,10 +82,10 @@ export const initialLeadership: LeadershipMember[] = [
     designation: 'Co-Founder & Chief Operating Officer',
     company_branch: 'Ravan Technologies',
     bio: 'Oversees engineering execution, edge computing, distributed software architectures, and institutional partnerships.',
-    image_url: '',
+    image_url: 'https://iecesxahkbkkafzmzwcd.supabase.co/storage/v1/object/public/avatars/leadership/1788499006162_o6z64q.jpg',
     display_order: 1,
     status: 'published',
-    slug: 'a-berry-sugandh-surya',
+    slug: 'berry-sugandh-surya',
     social_links: {
       linkedin: 'https://linkedin.com/in/berrysugandh-surya-a-68650b396',
       github: 'https://github.com/Berry1924',
@@ -117,7 +117,7 @@ export const initialLeadership: LeadershipMember[] = [
     image_url: 'https://iecesxahkbkkafzmzwcd.supabase.co/storage/v1/object/public/avatars/leadership/1788492358087_n1lya4.jpg',
     display_order: 3,
     status: 'published',
-    slug: 'v-vinothkumar',
+    slug: 'vinothkumar',
     social_links: {
       linkedin: 'https://www.linkedin.com/in/vinoth-kumar-396180382'
     }
@@ -850,7 +850,7 @@ export const initialSEOSettings: SEOSettings = {
   og_title: 'Ravan Technologies — Building Technology. Solving Real Problems.',
   og_description: 'Sovereign Intelligence in Enterprise Engineering. Software, AI/ML, Hackathons, Tech Park & Film Studio.',
   og_image: '/images/ravan-logo.png',
-  canonical_url: 'https://ravantechnologies.com',
+  canonical_url: 'https://ravantechnologies.in',
   robots_index: true,
   robots_follow: true,
   schema_type: 'Organization'

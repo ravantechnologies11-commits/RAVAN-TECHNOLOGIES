@@ -102,10 +102,13 @@ export const AdminSEO: React.FC = () => {
   };
 
   // Generate live JSON-LD Schema preview
+  const coFounder = leadership.find(l => l.id === 'lead-001' || l.designation?.toLowerCase().includes('co-founder')) || null;
   const liveSchema = buildPageJsonLdGraph({
     site,
     seo,
     founder,
+    coFounder,
+    teamMembers: leadership,
     currentPath: '/',
     pageTitle: seo.meta_title,
     pageDescription: seo.meta_description
@@ -447,7 +450,7 @@ export const AdminSEO: React.FC = () => {
                 {/* Metadata card footer */}
                 <div className="p-4 bg-[#0a192f] border-t border-slate-800 space-y-1">
                   <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
-                    ravantechnologies.com
+                    ravantechnologies.in
                   </span>
                   <h4 className="text-sm font-bold text-white line-clamp-1">
                     {seo.og_title || seo.meta_title}
@@ -1077,7 +1080,7 @@ export const AdminSEO: React.FC = () => {
             <div className="space-y-2">
               <span className="text-xs font-bold uppercase text-white block">robots.txt Directives</span>
               <div className="p-4 bg-[#07111e] rounded font-mono text-[11px] text-cyan-400 border border-slate-800 leading-relaxed overflow-x-auto">
-                {`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /admin/\nDisallow: /admin/*\nDisallow: /api/\n\nUser-agent: Googlebot-Image\nAllow: /\nAllow: /images/\n\nSitemap: https://ravantechnologies.com/sitemap.xml`}
+                {`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /admin/\nDisallow: /admin/*\nDisallow: /api/\n\nUser-agent: Googlebot-Image\nAllow: /\nAllow: /images/\n\nSitemap: https://ravantechnologies.in/sitemap.xml`}
               </div>
             </div>
 
@@ -1102,7 +1105,23 @@ export const AdminSEO: React.FC = () => {
                   <span className="text-secondary text-[10px]">priority 0.8</span>
                 </div>
                 <div className="p-2 bg-[#07111e] rounded border border-slate-800 flex items-center justify-between">
+                  <span>/team/v-abishek</span>
+                  <span className="text-secondary text-[10px]">priority 0.9</span>
+                </div>
+                <div className="p-2 bg-[#07111e] rounded border border-slate-800 flex items-center justify-between">
+                  <span>/team/berry-sugandh-surya</span>
+                  <span className="text-secondary text-[10px]">priority 0.9</span>
+                </div>
+                <div className="p-2 bg-[#07111e] rounded border border-slate-800 flex items-center justify-between">
                   <span>/team/sibi-raj-u</span>
+                  <span className="text-secondary text-[10px]">priority 0.8</span>
+                </div>
+                <div className="p-2 bg-[#07111e] rounded border border-slate-800 flex items-center justify-between">
+                  <span>/team/vinothkumar</span>
+                  <span className="text-secondary text-[10px]">priority 0.8</span>
+                </div>
+                <div className="p-2 bg-[#07111e] rounded border border-slate-800 flex items-center justify-between">
+                  <span>/team/mithra-s</span>
                   <span className="text-secondary text-[10px]">priority 0.8</span>
                 </div>
                 <div className="p-2 bg-[#07111e] rounded border border-slate-800 flex items-center justify-between">

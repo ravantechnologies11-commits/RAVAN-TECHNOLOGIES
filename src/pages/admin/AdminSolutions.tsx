@@ -996,7 +996,7 @@ export const AdminSolutions: React.FC = () => {
                               {sol.seo_title || `${sol.title} — Solutions | Ravan Technologies`}
                             </div>
                             <div className="text-emerald-400 text-xs font-mono truncate">
-                              https://ravantechnologies.com/solutions#{sol.slug}
+                              https://ravantechnologies.in/solutions#{sol.slug}
                             </div>
                             <div className="text-slate-400 text-xs mt-1 line-clamp-2 leading-relaxed">
                               {sol.seo_description || sol.description || 'Pre-validated architectural frameworks designed to solve high-concurrency enterprise challenges...'}

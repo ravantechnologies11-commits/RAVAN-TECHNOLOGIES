@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { RouteLoadingSkeleton } from './components/common/RouteLoadingSkeleton';
 
 // Code-split both applications so public visitors never fetch or evaluate admin bundles
@@ -15,7 +15,7 @@ const AppAdmin = lazy(() => import('./AppAdmin').then(m => ({ default: m.AppAdmi
  *    - VITE_APP_MODE === 'public' -> Public Website
  * 
  * 2. Dedicated Production or Staging CMS domains:
- *    - cms.ravantechnologies.com -> Dedicated Admin CMS
+ *    - cms.ravantechnologies.in -> Dedicated Admin CMS
  *    - Any domain starting with 'cms.' or 'admin.' -> Dedicated Admin CMS
  * 
  * 3. Temporary / Staging Vercel Admin deployments:
@@ -25,7 +25,7 @@ const AppAdmin = lazy(() => import('./AppAdmin').then(m => ({ default: m.AppAdmi
  *    - On localhost (127.0.0.1 or localhost), if path starts with /admin or query ?mode=admin -> Serves Admin CMS
  * 
  * 5. Default:
- *    - Public Website (e.g. ravan-technologies-i99k.vercel.app or ravantechnologies.com) -> Serves Public Website
+ *    - Public Website (e.g. ravan-technologies-i99k.vercel.app or ravantechnologies.in) -> Serves Public Website
  *    - On the public website, /admin strictly renders 404 (NotFoundPage)
  */
 export function isAdminDeployment(): boolean {
@@ -39,7 +39,7 @@ export function isAdminDeployment(): boolean {
   const hostname = window.location.hostname.toLowerCase();
 
   // 2. Authoritative production CMS subdomains
-  if (hostname === 'cms.ravantechnologies.com') return true;
+  if (hostname === 'cms.ravantechnologies.in') return true;
   if (hostname.startsWith('cms.') || hostname.startsWith('admin.')) return true;
 
   // 3. Vercel deployment domain for admin project (e.g. ravan-technologies-admin.vercel.app)

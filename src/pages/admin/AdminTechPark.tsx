@@ -247,7 +247,7 @@ export const AdminTechPark: React.FC = () => {
                   type="text"
                   value={techPark.contact_info || ''}
                   onChange={e => setTechPark({ ...techPark, contact_info: e.target.value })}
-                  placeholder="techpark@ravantechnologies.com"
+                  placeholder="techpark@ravantechnologies.in"
                   className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                 />
               </div>

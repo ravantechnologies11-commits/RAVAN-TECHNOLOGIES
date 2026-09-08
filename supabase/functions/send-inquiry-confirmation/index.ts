@@ -141,7 +141,7 @@ serve(async (req) => {
               </p>
               <p style="font-size: 11px; color: #94a3b8; font-weight: 600; margin: 0;">
                 RAVAN TECHNOLOGIES — SOVEREIGN ENTERPRISE INTELLIGENCE<br>
-                Ravan Tech Park, Outer Ring Road, Bengaluru 560103, India
+                Ravan Technologies Headquarters, Karapallam, Nayudumangalam, Tiruvannamalai 606804, Tamil Nadu, India
               </p>
             </td>
           </tr>

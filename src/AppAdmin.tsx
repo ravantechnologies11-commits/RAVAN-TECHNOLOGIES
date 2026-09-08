@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { RouteLoadingSkeleton } from './components/common/RouteLoadingSkeleton';
@@ -66,7 +66,7 @@ export const ProtectedAdminRoute: React.FC<{ children: React.ReactNode }> = ({ c
  * AppAdmin — Dedicated Admin CMS Control Panel Application
  * 
  * Deployment Rules:
- * 1. Used when deployed to dedicated Admin Vercel project or cms.ravantechnologies.com.
+ * 1. Used when deployed to dedicated Admin Vercel project or cms.ravantechnologies.in.
  * 2. Root / automatically redirects to /admin dashboard (or /admin/login if unauthenticated).
  * 3. Sets noindex/nofollow to prevent crawler indexing.
  * 4. Strictly protects all administrative mutation consoles.

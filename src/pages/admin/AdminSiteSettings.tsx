@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   logo_dark_url TEXT,
   logo_alt TEXT,
   favicon_url TEXT,
-  contact_email TEXT NOT NULL DEFAULT 'contact@ravantechnologies.com',
+  contact_email TEXT NOT NULL DEFAULT 'ravantechnologies11@gmail.com',
   inquiry_email TEXT,
   contact_phone TEXT,
   whatsapp_number TEXT,
@@ -107,7 +107,7 @@ DROP POLICY IF EXISTS "Only admins can modify site settings" ON public.site_sett
 CREATE POLICY "Only admins can modify site settings" ON public.site_settings FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 INSERT INTO public.site_settings (id, site_name, tagline, description, logo_url, contact_email, office_address)
-VALUES ('primary_settings', 'Ravan Technologies', 'Building Technology. Solving Real Problems.', 'Architecting sovereign software systems, enterprise intelligence, and physical computing infrastructure for institutional scale.', '/images/ravan-logo.png', 'contact@ravantechnologies.com', 'Ravan Technologies Headquarters, Thiruvannamalai, Tamil Nadu, India')
+VALUES ('primary_settings', 'Ravan Technologies', 'Building Technology. Solving Real Problems.', 'Architecting sovereign software systems, enterprise intelligence, and physical computing infrastructure for institutional scale.', '/images/ravan-logo.png', 'ravantechnologies11@gmail.com', 'Ravan Technologies Headquarters, Thiruvannamalai, Tamil Nadu, India')
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.seo_metadata (
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS public.seo_metadata (
   meta_description TEXT NOT NULL DEFAULT 'Ravan Technologies builds sovereign digital backbones, high-concurrency systems, and applied AI infrastructure.',
   focus_keyword TEXT DEFAULT 'Enterprise AI',
   secondary_keywords JSONB DEFAULT '["High Scale Systems", "Sovereign AI"]'::jsonb,
-  canonical_url TEXT NOT NULL DEFAULT 'https://ravantechnologies.com',
+  canonical_url TEXT NOT NULL DEFAULT 'https://ravantechnologies.in',
   robots_index BOOLEAN NOT NULL DEFAULT true,
   robots_follow BOOLEAN NOT NULL DEFAULT true,
   og_title TEXT DEFAULT 'Ravan Technologies — Enterprise Intelligence',
@@ -135,7 +135,7 @@ DROP POLICY IF EXISTS "Only admins can manage SEO" ON public.seo_metadata;
 CREATE POLICY "Only admins can manage SEO" ON public.seo_metadata FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 INSERT INTO public.seo_metadata (id, meta_title, meta_description, canonical_url)
-VALUES ('primary_seo', 'Ravan Technologies | Sovereign Enterprise Engineering & AI', 'Ravan Technologies builds sovereign digital backbones, high-concurrency systems, and applied AI infrastructure.', 'https://ravantechnologies.com')
+VALUES ('primary_seo', 'Ravan Technologies | Sovereign Enterprise Engineering & AI', 'Ravan Technologies builds sovereign digital backbones, high-concurrency systems, and applied AI infrastructure.', 'https://ravantechnologies.in')
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.founders (

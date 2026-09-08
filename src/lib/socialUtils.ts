@@ -107,18 +107,76 @@ export function validateSocialUrl(url?: string): { valid: boolean; error?: strin
 }
 
 /**
- * Helper to check whether a given social URL is valid and displayable.
+ * Helper to check whether a given social URL is valid, safe, and displayable.
+ * Strictly filters out empty domain roots (e.g. https://twitter.com/), placeholder domains,
+ * and dangerous URI protocols.
  */
 export function isDisplayableSocialUrl(url?: string): boolean {
   if (!url || typeof url !== 'string') return false;
   const trimmed = url.trim();
   if (!trimmed || trimmed === '#' || trimmed.startsWith('#')) return false;
+
   const lower = trimmed.toLowerCase();
-  if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) return false;
+  if (
+    lower.startsWith('javascript:') ||
+    lower.startsWith('data:') ||
+    lower.startsWith('vbscript:') ||
+    lower.startsWith('file:') ||
+    lower.startsWith('about:')
+  ) {
+    return false;
+  }
+
   try {
     const parsed = new URL(trimmed);
-    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return false;
+    }
+
+    // Disallow auth credentials in URL (e.g. https://user@...)
+    if (parsed.username || parsed.password) {
+      return false;
+    }
+
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    if (!host || !host.includes('.')) return false;
+
+    // Disallow generic placeholder domains
+    if (
+      host === 'example.com' ||
+      host === 'placeholder.com' ||
+      host === 'mysite.com' ||
+      host === 'domain.com'
+    ) {
+      return false;
+    }
+
+    // For major social networks, ensure a specific profile/handle/path is present
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    const knownPlatforms = [
+      'twitter.com',
+      'x.com',
+      'instagram.com',
+      'linkedin.com',
+      'github.com',
+      'facebook.com',
+      'youtube.com'
+    ];
+
+    if (knownPlatforms.includes(host)) {
+      // Must not be empty root domain (e.g., https://twitter.com or https://twitter.com/)
+      if (!cleanPath || cleanPath === '' || cleanPath === '/') {
+        return false;
+      }
+      // Must not be generic feed/home roots
+      if (cleanPath === '/home' || cleanPath === '/feed' || cleanPath === '/explore') {
+        return false;
+      }
+    }
+
+    return true;
   } catch {
     return false;
   }
 }
+

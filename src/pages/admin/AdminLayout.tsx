@@ -301,7 +301,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title }) => 
               </div>
               <div className="overflow-hidden min-w-0">
                 <div className="text-xs font-bold text-white truncate">{user?.name || 'Administrator'}</div>
-                <div className="text-[10px] text-slate-400 truncate">{user?.email || 'admin@ravantechnologies.com'}</div>
+                <div className="text-[10px] text-slate-400 truncate">{user?.email || 'admin@ravantechnologies.in'}</div>
               </div>
             </div>
             <button

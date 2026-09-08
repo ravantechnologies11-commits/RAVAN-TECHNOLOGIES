@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { SEOHead } from '../components/common/SEOHead';
 import { SmartImage } from '../components/common/SmartImage';
@@ -9,7 +9,7 @@ import { ProfileExperienceSection } from '../components/team/ProfileExperienceSe
 import { ProfileProjectsSection } from '../components/team/ProfileProjectsSection';
 import { ProfileSkillsSection } from '../components/team/ProfileSkillsSection';
 import { WorkWithUsModal } from '../components/common/WorkWithUsModal';
-import { dataService, generateSlug } from '../lib/dataService';
+import { dataService, generateSlug, LEGACY_SLUG_MAP } from '../lib/dataService';
 import { buildTeamMemberPersonSchema, buildFounderPersonSchema } from '../lib/seoService';
 import { LeadershipMember, Founder } from '../types';
 import { 
@@ -36,13 +36,20 @@ type ProfileData =
 
 export const TeamMemberProfilePage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  const cleanSlug = (slug || '').toLowerCase().trim();
+
+  // If a legacy slug is accessed, gracefully redirect to the canonical normalized slug
+  if (cleanSlug && LEGACY_SLUG_MAP[cleanSlug]) {
+    return <Navigate to={`/team/${LEGACY_SLUG_MAP[cleanSlug]}`} replace />;
+  }
+
   const [profile, setProfile] = useState<ProfileData | null>(() => {
-    if (!slug) return null;
-    return dataService.getProfileBySlugSync(slug.toLowerCase().trim());
+    if (!cleanSlug) return null;
+    return dataService.getProfileBySlugSync(cleanSlug);
   });
   const [loading, setLoading] = useState<boolean>(() => {
-    if (!slug) return false;
-    return !dataService.getProfileBySlugSync(slug.toLowerCase().trim());
+    if (!cleanSlug) return false;
+    return !dataService.getProfileBySlugSync(cleanSlug);
   });
   const [isWorkModalOpen, setIsWorkModalOpen] = useState(false);
 
@@ -166,6 +173,7 @@ export const TeamMemberProfilePage: React.FC = () => {
   // Render Founder Profile
   if (profile.type === 'founder') {
     const { member } = profile;
+    const canonicalPath = '/team/v-abishek';
     return (
       <Layout>
         <SEOHead 
@@ -173,12 +181,12 @@ export const TeamMemberProfilePage: React.FC = () => {
           description={member.seo_description || member.short_intro || member.bio || member.vision || `Executive leadership profile for ${member.name}.`}
           ogImage={member.og_image || member.image_url}
           ogType="profile"
-          canonical={member.canonical_url || `/team/${slug}`}
+          canonical={canonicalPath}
           noindex={member.status !== 'published'}
           breadcrumbs={[
             { name: 'Home', path: '/' },
             { name: 'Team Directory', path: '/team' },
-            { name: member.name, path: `/team/${slug}` }
+            { name: member.name, path: canonicalPath }
           ]}
           mainEntity={buildFounderPersonSchema(member)}
         />
@@ -380,6 +388,8 @@ export const TeamMemberProfilePage: React.FC = () => {
 
   // Render Leadership Member Profile
   const { member } = profile;
+  const canonicalSlug = member.slug || cleanSlug;
+  const canonicalPath = `/team/${canonicalSlug}`;
   const initials = member.name
     ? member.name
         .split(' ')
@@ -393,18 +403,18 @@ export const TeamMemberProfilePage: React.FC = () => {
   return (
     <Layout>
       <SEOHead 
-        title={`${member.name} — ${member.designation} | Ravan Technologies`}
-        description={member.short_intro || member.bio || `Executive profile of ${member.name}, ${member.designation} at Ravan Technologies.`}
-        ogImage={member.image_url}
+        title={member.seo_title || `${member.name} — ${member.designation} | Ravan Technologies`}
+        description={member.seo_description || member.short_intro || member.bio || `Executive profile of ${member.name}, ${member.designation} at Ravan Technologies.`}
+        ogImage={member.og_image || member.image_url}
         ogType="profile"
-        canonical={`/team/${slug}`}
+        canonical={canonicalPath}
         noindex={member.status !== 'published'}
         breadcrumbs={[
           { name: 'Home', path: '/' },
           { name: 'Team Directory', path: '/team' },
-          { name: member.name, path: `/team/${slug}` }
+          { name: member.name, path: canonicalPath }
         ]}
-        mainEntity={buildTeamMemberPersonSchema(member, slug || '')}
+        mainEntity={buildTeamMemberPersonSchema(member, canonicalSlug)}
       />
 
       <div className="w-full max-w-container-max mx-auto px-gutter pt-20 pb-28">

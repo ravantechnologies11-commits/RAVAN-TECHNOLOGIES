@@ -92,7 +92,7 @@ export const AdminEvents: React.FC = () => {
       location: 'Ravan Tech Park Amphitheatre, Thiruvannamalai, Tamil Nadu, India',
       description: 'Annual gathering of enterprise architects, AI researchers, and sovereign infrastructure leaders.',
       image_url: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=1200',
-      registration_link: 'https://ravantechnologies.com/events/summit',
+      registration_link: 'https://ravantechnologies.in/events',
       status: 'upcoming'
     };
     setEditingItem(newItem);
@@ -439,7 +439,7 @@ export const AdminEvents: React.FC = () => {
                     type="text"
                     value={editingItem.registration_link || ''}
                     onChange={e => setEditingItem({ ...editingItem, registration_link: e.target.value })}
-                    placeholder="https://ravantechnologies.com/events/register"
+                    placeholder="https://ravantechnologies.in/events"
                     className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                   />
                 </div>

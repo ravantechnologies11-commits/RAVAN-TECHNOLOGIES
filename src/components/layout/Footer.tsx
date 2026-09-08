@@ -138,7 +138,7 @@ export const Footer: React.FC = () => {
           </p>
           <div className="text-[11px] text-on-surface-variant space-y-1">
             <p><strong>HQ:</strong> {site?.hq_location || site?.office_address || (loading ? 'Loading...' : 'Thiruvannamalai, Tamil Nadu, India')}</p>
-            <p><strong>Inquiries:</strong> {site?.contact_email || (loading ? 'Loading...' : 'contact@ravantechnologies.com')}</p>
+            <p><strong>Inquiries:</strong> {site?.contact_email || (loading ? 'Loading...' : 'ravantechnologies11@gmail.com')}</p>
           </div>
 
           {/* Dynamic Corporate Social Channels (strictly database-driven) */}

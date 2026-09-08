@@ -17,17 +17,18 @@ const AUTHORIZED_ADMIN_ROLES = ['super_admin', 'admin'];
 
 // Explicit authorized administrative domains/emails
 const AUTHORIZED_ADMIN_EMAILS = [
-  'admin@ravantechnologies.com',
-  'founder@ravantechnologies.com',
-  'ceo@ravantechnologies.com',
-  'contact@ravantechnologies.com'
+  'admin@ravantechnologies.in',
+  'founder@ravantechnologies.in',
+  'ceo@ravantechnologies.in',
+  'contact@ravantechnologies.in',
+  'ravantechnologies11@gmail.com'
 ];
 
 function isAuthorizedAdminEmail(email: string): boolean {
   if (!email) return false;
   const clean = email.trim().toLowerCase();
   if (AUTHORIZED_ADMIN_EMAILS.includes(clean)) return true;
-  if (clean.endsWith('@ravantechnologies.com')) return true;
+  if (clean.endsWith('@ravantechnologies.in')) return true;
   return false;
 }
 

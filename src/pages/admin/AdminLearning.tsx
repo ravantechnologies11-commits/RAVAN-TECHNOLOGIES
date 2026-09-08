@@ -74,7 +74,7 @@ export const AdminLearning: React.FC = () => {
       enrolled_count: '650+',
       image_url: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&q=80&w=800',
       video_url: '',
-      external_url: 'https://ravantechnologies.com/learning/enroll',
+      external_url: 'https://ravantechnologies.in/learning',
       instructor_info: 'Ravan Systems Architecture Council',
       category: 'Cloud Architecture',
       methodology_phase: 'Phase 2: Core Engineering',
@@ -534,7 +534,7 @@ export const AdminLearning: React.FC = () => {
                         type="text"
                         value={editingItem.external_url || ''}
                         onChange={e => setEditingItem({ ...editingItem, external_url: e.target.value })}
-                        placeholder="https://ravantechnologies.com/learning/enroll"
+                        placeholder="https://ravantechnologies.in/learning"
                         className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                       />
                     </div>

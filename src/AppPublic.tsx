@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { RouteLoadingSkeleton } from './components/common/RouteLoadingSkeleton';
 import { ScrollToTop } from './components/common/ScrollToTop';
 
@@ -19,6 +19,7 @@ const ContactPage = lazy(() => import('./pages/ContactPage').then(m => ({ defaul
 const GalleryPage = lazy(() => import('./pages/GalleryPage').then(m => ({ default: m.GalleryPage })));
 const BlogPage = lazy(() => import('./pages/BlogPage').then(m => ({ default: m.BlogPage })));
 const EventsPage = lazy(() => import('./pages/EventsPage').then(m => ({ default: m.EventsPage })));
+const AIMLPage = lazy(() => import('./pages/AIMLPage').then(m => ({ default: m.AIMLPage })));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 
 /**
@@ -38,14 +39,17 @@ export const AppPublic: React.FC = () => {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
-        <Route path="/founder" element={<FounderPage />} />
-        <Route path="/founders" element={<FounderPage />} />
+        
+        {/* Clean 301-equivalent client redirects for legacy founder routes to canonical URLs */}
+        <Route path="/founder" element={<Navigate to="/team/v-abishek" replace />} />
+        <Route path="/founders" element={<Navigate to="/team" replace />} />
         <Route path="/founder/:slug" element={<TeamMemberProfilePage />} />
         <Route path="/founders/:slug" element={<TeamMemberProfilePage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/solutions" element={<SolutionsPage />} />
         <Route path="/hackathons" element={<HackathonsPage />} />
         <Route path="/learning" element={<LearningPage />} />
+        <Route path="/ai-ml" element={<AIMLPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/ecosystem" element={<EcosystemPage />} />
         <Route path="/team" element={<TeamPage />} />

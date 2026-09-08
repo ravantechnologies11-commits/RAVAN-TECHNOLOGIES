@@ -246,7 +246,7 @@ export const AdminFilmStudio: React.FC = () => {
                   type="text"
                   value={studio.contact_info || ''}
                   onChange={e => setStudio({ ...studio, contact_info: e.target.value })}
-                  placeholder="filmstudio@ravantechnologies.com"
+                  placeholder="filmstudio@ravantechnologies.in"
                   className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                 />
               </div>

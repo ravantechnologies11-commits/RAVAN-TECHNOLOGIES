@@ -47,7 +47,7 @@ export const AdminAIML: React.FC = () => {
     setLoading(true);
     try {
       const data = await dataService.getAIMLModels();
-      setModels(data && data.length > 0 ? data : initialAIMLModels);
+      setModels(data && data.length > 0 ? data : []);
     } catch (e) {
       console.error(e);
       showToast('Failed to load AI models from database.', 'error');
@@ -73,7 +73,7 @@ export const AdminAIML: React.FC = () => {
       use_cases: ['Cinematic Virtual Production', 'Industrial Digital Twins', 'Autonomous Robotics Navigation'],
       version: 'v1.2-enterprise',
       latency: '< 8ms per frame',
-      documentation_url: 'https://ravantechnologies.com/solutions/ai-models',
+      documentation_url: 'https://ravantechnologies.in/ai-ml',
       image_url: '',
       status: 'published',
       display_order: models.length + 1
@@ -457,7 +457,7 @@ export const AdminAIML: React.FC = () => {
                         type="text"
                         value={editingItem.documentation_url || ''}
                         onChange={e => setEditingItem({ ...editingItem, documentation_url: e.target.value })}
-                        placeholder="https://ravantechnologies.com/docs/model"
+                        placeholder="https://ravantechnologies.in/ai-ml"
                         className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                       />
                     </div>

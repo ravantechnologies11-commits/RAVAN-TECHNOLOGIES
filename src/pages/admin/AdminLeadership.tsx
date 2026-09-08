@@ -1528,7 +1528,7 @@ export const AdminLeadership: React.FC = () => {
                                     setMembers(copy);
                                     markChanged();
                                   }}
-                                  placeholder="executive@ravantechnologies.com"
+                                  placeholder="executive@ravantechnologies.in"
                                   className="w-full bg-transparent text-white text-xs focus:outline-none"
                                 />
                                 {m.public_email && (

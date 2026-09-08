@@ -72,7 +72,7 @@ export const AdminHackathons: React.FC = () => {
       event_date: 'November 15-17, 2026',
       time: '09:00 AM - 06:00 PM IST',
       location: 'Ravan Tech Park, Thiruvannamalai & Virtual',
-      registration_url: 'https://ravantechnologies.com/hackathons/register',
+      registration_url: 'https://ravantechnologies.in/hackathons',
       status: 'upcoming',
       focus_statement: 'Solving mission-critical engineering bottlenecks through distributed computing.',
       description: 'Join top engineering talent to solve real-world problems in high-throughput data processing.',
@@ -103,7 +103,7 @@ export const AdminHackathons: React.FC = () => {
         '3rd Place: INR 1,00,000'
       ],
       eligibility: 'Open to engineering students, senior developers, and independent researchers worldwide.',
-      contact_info: 'hackathons@ravantechnologies.com',
+      contact_info: 'ravantechnologies11@gmail.com',
       display_order: hackathons.length + 1,
       winning_solutions: []
     };
