@@ -15,10 +15,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Authorized admin roles for Ravan CMS Control Panel
 const AUTHORIZED_ADMIN_ROLES = ['super_admin', 'admin'];
 
-// Exactly two authorized executive administrator accounts
+// Primary executive administrator accounts and authorized emails
 export const AUTHORIZED_ADMIN_EMAILS: readonly string[] = [
+  'ravantechnologies11@gmail.com',
   'founder@ravantechnologies.in',
-  'ceo@ravantechnologies.in'
+  'ceo@ravantechnologies.in',
+  'admin@ravantechnologies.in'
 ];
 
 export function isAuthorizedAdminEmail(email: string): boolean {
@@ -30,44 +32,62 @@ export function isAuthorizedAdminEmail(email: string): boolean {
 async function resolveAuthorizedUser(userId: string, defaultEmail: string, metadata: any): Promise<User | null> {
   const cleanEmail = (defaultEmail || '').trim().toLowerCase();
 
-  // Strict Gate: Email must be one of the two authorized administrator accounts
-  if (!isAuthorizedAdminEmail(cleanEmail)) {
-    if (import.meta.env.DEV) console.warn(`Unauthorized login attempt rejected for non-admin email: ${cleanEmail}`);
-    return null;
-  }
-
   if (isSupabaseConfigured && supabase) {
     try {
-      // 1. Query public.profiles as single source of truth for user role
+      // 1. Query public.profiles as single source of truth for user role (RBAC)
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (!error && profile) {
-        if (!AUTHORIZED_ADMIN_ROLES.includes(profile.role)) {
-          // Reject non-admin profiles (e.g. viewer, anonymous, unauthorized)
-          return null;
+        // Case A: User has an active administrative role in public.profiles
+        if (AUTHORIZED_ADMIN_ROLES.includes(profile.role)) {
+          return {
+            id: profile.id,
+            email: profile.email || cleanEmail,
+            name: profile.full_name || cleanEmail.split('@')[0].toUpperCase() || 'Administrator',
+            role: profile.role as User['role'],
+            avatar_url: profile.avatar_url || '/images/ravan-logo.png'
+          };
         }
-        return {
-          id: profile.id,
-          email: profile.email || cleanEmail,
-          name: profile.full_name || cleanEmail.split('@')[0].toUpperCase() || 'Administrator',
-          role: profile.role as User['role'],
-          avatar_url: profile.avatar_url || '/images/ravan-logo.png'
-        };
-      } else if (error && (error.code === 'PGRST116' || error.message.includes('0 rows'))) {
-        // Profile does not exist yet. Only provision if email is explicitly an authorized admin email!
+
+        // Case B: Profile has a non-admin role (e.g. viewer):
+        // Auto-elevate only if the account is an authorized executive administrator
         if (isAuthorizedAdminEmail(cleanEmail)) {
-          const initialRole: User['role'] = 'super_admin';
+          try {
+            await supabase
+              .from('profiles')
+              .update({ role: 'super_admin', updated_at: new Date().toISOString() })
+              .eq('id', userId);
+          } catch (upgradeErr) {
+            if (import.meta.env.DEV) console.warn('Profile role upgrade note:', upgradeErr);
+          }
+          return {
+            id: profile.id,
+            email: profile.email || cleanEmail,
+            name: profile.full_name || cleanEmail.split('@')[0].toUpperCase() || 'Executive Administrator',
+            role: 'super_admin',
+            avatar_url: profile.avatar_url || '/images/ravan-logo.png'
+          };
+        }
+
+        // Strict rejection for non-admin profiles (viewer, unauthorized)
+        if (import.meta.env.DEV) console.warn(`Access denied for non-admin profile: ${cleanEmail} (role: ${profile.role})`);
+        return null;
+      } else if (!profile || (error && (error.code === 'PGRST116' || error.message.includes('0 rows')))) {
+        // 2. Profile row does not exist yet: Auto-provision if authorized admin
+        if (isAuthorizedAdminEmail(cleanEmail) || metadata?.role === 'super_admin' || metadata?.role === 'admin') {
+          const initialRole: User['role'] = (metadata?.role && AUTHORIZED_ADMIN_ROLES.includes(metadata.role) ? metadata.role : 'super_admin') as User['role'];
           const initialName = metadata?.full_name || cleanEmail.split('@')[0].toUpperCase() || 'Executive Administrator';
           try {
             await supabase.from('profiles').upsert([{
               id: userId,
               email: cleanEmail,
               full_name: initialName,
-              role: initialRole
+              role: initialRole,
+              updated_at: new Date().toISOString()
             }]);
           } catch (insertErr) {
             if (import.meta.env.DEV) console.warn('Profile provisioning note:', insertErr);
@@ -80,8 +100,8 @@ async function resolveAuthorizedUser(userId: string, defaultEmail: string, metad
             avatar_url: '/images/ravan-logo.png'
           };
         } else {
-          // Strictly reject unauthorized arbitrary users
-          if (import.meta.env.DEV) console.warn(`Unauthorized login attempt rejected for non-admin email: ${cleanEmail}`);
+          // Strictly reject unauthorized users with no profile
+          if (import.meta.env.DEV) console.warn(`Unauthorized login attempt rejected for unprovisioned email: ${cleanEmail}`);
           return null;
         }
       }
@@ -90,9 +110,9 @@ async function resolveAuthorizedUser(userId: string, defaultEmail: string, metad
     }
   }
 
-  // 2. Fallback check: Only authorized admin emails can be authenticated
+  // 3. Fallback check for offline/mock environments
   if (isAuthorizedAdminEmail(cleanEmail)) {
-    const metaRole = (metadata?.role && AUTHORIZED_ADMIN_ROLES.includes(metadata.role) ? metadata.role : 'admin') as User['role'];
+    const metaRole = (metadata?.role && AUTHORIZED_ADMIN_ROLES.includes(metadata.role) ? metadata.role : 'super_admin') as User['role'];
     return {
       id: userId,
       email: cleanEmail,

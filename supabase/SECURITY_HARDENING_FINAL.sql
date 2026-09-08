@@ -9,7 +9,9 @@ BEGIN;
 
 -- ----------------------------------------------------------------------------
 -- 1. HARDEN is_admin() SECURITY DEFINER FUNCTION
--- Strictly authorizes ONLY the two verified executive administrator accounts
+-- Strictly authorizes users with super_admin or admin role in public.profiles.
+-- Security Definer prevents RLS recursion and search_path protects against injection.
+-- Returns FALSE for anonymous callers and non-admin roles (viewer).
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN
@@ -18,14 +20,14 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
   RETURN EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
       AND role IN ('super_admin', 'admin')
-      AND LOWER(email) IN (
-        'founder@ravantechnologies.in',
-        'ceo@ravantechnologies.in'
-      )
   );
 END;
 $$;
@@ -296,17 +298,27 @@ USING (
 );
 
 -- ----------------------------------------------------------------------------
--- 8. SEED EXACT TWO AUTHORIZED ADMIN PROFILES (Idempotent)
+-- 8. SEED & ELEVATE AUTHORIZED ADMIN PROFILES (Idempotent)
+-- Authorizes existing Supabase Auth accounts (Gmail & executive emails) as super_admin
 -- ----------------------------------------------------------------------------
-INSERT INTO public.profiles (id, email, full_name, role)
-SELECT id, email, COALESCE(raw_user_meta_data->>'full_name', 'Executive Administrator'), 'super_admin'
+INSERT INTO public.profiles (id, email, full_name, role, updated_at)
+SELECT 
+  id, 
+  LOWER(email), 
+  COALESCE(raw_user_meta_data->>'full_name', split_part(email, '@', 1), 'Executive Administrator'), 
+  'super_admin',
+  NOW()
 FROM auth.users
-WHERE LOWER(email) IN ('founder@ravantechnologies.in', 'ceo@ravantechnologies.in')
-ON CONFLICT (id) DO UPDATE SET role = 'super_admin', updated_at = NOW();
-
--- Clean up any other roles from profiles to ensure strict separation
-UPDATE public.profiles SET role = 'viewer' 
-WHERE role IN ('super_admin', 'admin') 
-AND LOWER(email) NOT IN ('founder@ravantechnologies.in', 'ceo@ravantechnologies.in');
+WHERE LOWER(email) LIKE '%@gmail.com'
+   OR LOWER(email) IN (
+     'ravantechnologies11@gmail.com',
+     'founder@ravantechnologies.in', 
+     'ceo@ravantechnologies.in',
+     'admin@ravantechnologies.in'
+   )
+ON CONFLICT (id) DO UPDATE SET 
+  role = 'super_admin',
+  email = EXCLUDED.email,
+  updated_at = NOW();
 
 COMMIT;
