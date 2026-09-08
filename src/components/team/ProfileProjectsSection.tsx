@@ -1,6 +1,7 @@
 import React from 'react';
 import { ProfileProject } from '../../types';
 import { Layers, ExternalLink, Github, Sparkles, CheckCircle, Clock } from 'lucide-react';
+import { isDisplayableSocialUrl } from '../../lib/socialUtils';
 
 interface ProfileProjectsSectionProps {
   projects?: ProfileProject[];
@@ -128,7 +129,7 @@ export const ProfileProjectsSection: React.FC<ProfileProjectsSectionProps> = ({ 
               {/* Action Links Footer */}
               {(proj.project_url || proj.github_url) && (
                 <div className="pt-4 mt-4 border-t border-outline-variant/50 flex flex-wrap items-center gap-3">
-                  {proj.project_url && (
+                  {proj.project_url && isDisplayableSocialUrl(proj.project_url) && (
                     <a
                       href={proj.project_url}
                       target="_blank"
@@ -139,7 +140,7 @@ export const ProfileProjectsSection: React.FC<ProfileProjectsSectionProps> = ({ 
                       <ExternalLink className="w-3 h-3 text-secondary" />
                     </a>
                   )}
-                  {proj.github_url && (
+                  {proj.github_url && isDisplayableSocialUrl(proj.github_url) && (
                     <a
                       href={proj.github_url}
                       target="_blank"

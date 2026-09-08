@@ -343,7 +343,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title }) => 
 
           <div className="flex items-center gap-3 shrink-0">
             <a
-              href="https://ravan-technologies-i99k.vercel.app"
+              href="https://ravantechnologies.in"
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded text-xs font-semibold transition-colors"

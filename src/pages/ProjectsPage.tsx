@@ -4,25 +4,34 @@ import { SEOHead } from '../components/common/SEOHead';
 import { SmartImage } from '../components/common/SmartImage';
 import { dataService } from '../lib/dataService';
 import { ProjectItem } from '../types';
-import { initialProjects } from '../data/initialData';
-import { ArrowUpRight, FolderGit2, Sparkles, Filter } from 'lucide-react';
+import { ArrowUpRight, FolderGit2, Sparkles, Filter, Lock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export const ProjectsPage: React.FC = () => {
-  const [projects, setProjects] = useState<ProjectItem[]>(() => dataService.getProjectsSync());
-  const [loading, setLoading] = useState(false);
+  const [projects, setProjects] = useState<ProjectItem[] | null>(() => dataService.getCachedProjects());
+  const [loading, setLoading] = useState<boolean>(() => dataService.getCachedProjects() === null);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
   useEffect(() => {
     let isMounted = true;
     dataService.getProjects().then((data) => {
-      if (isMounted && data) {
-        setProjects(data);
+      if (isMounted) {
+        setProjects(data || []);
+        setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) {
+        setProjects([]);
+        setLoading(false);
+      }
+    });
 
     const handleUpdate = () => {
-      dataService.getProjects().then((data) => {
-        if (isMounted) setProjects(data);
+      dataService.getProjects(true).then((data) => {
+        if (isMounted) {
+          setProjects(data || []);
+          setLoading(false);
+        }
       });
     };
     window.addEventListener('ravan_data_updated', handleUpdate);
@@ -34,7 +43,8 @@ export const ProjectsPage: React.FC = () => {
 
   const categories = ['ALL', 'FINTECH', 'LOGISTICS', 'AI / ML', 'INFRASTRUCTURE', 'ENTERPRISE'];
 
-  const filteredProjects = (projects || []).filter(p => {
+  const allProjects = projects || [];
+  const filteredProjects = allProjects.filter(p => {
     if (selectedCategory === 'ALL') return true;
     return (p.category || '').toUpperCase() === selectedCategory;
   });
@@ -82,7 +92,7 @@ export const ProjectsPage: React.FC = () => {
 
       {/* Projects Grid */}
       <section className="w-full max-w-container-max mx-auto px-gutter pb-28">
-        {loading || !projects ? (
+        {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10" aria-busy="true">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="bg-surface rounded-2xl overflow-hidden border border-outline-variant/70 animate-pulse">
@@ -95,6 +105,20 @@ export const ProjectsPage: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        ) : allProjects.length === 0 ? (
+          <div className="p-16 rounded-2xl bg-surface border border-outline-variant/70 text-center max-w-xl mx-auto my-12">
+            <Lock className="w-12 h-12 text-secondary/60 mx-auto mb-4" />
+            <h3 className="text-xl font-bold font-display text-primary mb-2">Case Studies Under Non-Disclosure Review</h3>
+            <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+              Enterprise software architectures, sovereign trading engines, and private infrastructure deployments are currently undergoing institutional non-disclosure clearance before public indexing.
+            </p>
+            <Link
+              to="/contact"
+              className="inline-flex items-center gap-2 px-6 py-3.5 bg-primary text-white text-xs font-semibold tracking-widest uppercase rounded hover:bg-primary-container transition-all shadow-md"
+            >
+              <span>REQUEST CONFIDENTIAL BRIEFING</span>
+            </Link>
           </div>
         ) : filteredProjects.length === 0 ? (
           <div className="p-16 rounded-2xl bg-surface border border-outline-variant text-center max-w-xl mx-auto my-12">

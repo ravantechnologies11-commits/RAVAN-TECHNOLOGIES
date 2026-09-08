@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
 import { HackathonItem, ProblemStatement } from '../../types';
-import { initialHackathon } from '../../data/initialData';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import {
@@ -15,7 +14,9 @@ import {
   Calendar,
   MapPin,
   Upload,
-  X
+  X,
+  Code2,
+  Focus
 } from 'lucide-react';
 
 export const AdminHackathons: React.FC = () => {
@@ -44,7 +45,7 @@ export const AdminHackathons: React.FC = () => {
     setLoading(true);
     try {
       const data = await dataService.getHackathons();
-      setHackathons(data && data.length > 0 ? data : [initialHackathon]);
+      setHackathons(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
       showToast('Failed to load hackathons from database.', 'error');
@@ -66,44 +67,26 @@ export const AdminHackathons: React.FC = () => {
   const handleOpenCreate = () => {
     const newItem: HackathonItem = {
       id: 'hackathon-' + Date.now(),
-      title: 'National Enterprise Hackathon',
+      title: '',
       edition: 'Edition ' + (hackathons.length + 1) + '.0',
-      subtitle: 'Building Autonomous Systems & Sovereign AI',
-      event_date: 'November 15-17, 2026',
-      time: '09:00 AM - 06:00 PM IST',
+      subtitle: '',
+      event_date: '',
+      time: '',
       location: 'Ravan Tech Park, Thiruvannamalai & Virtual',
-      registration_url: 'https://ravantechnologies.in/hackathons',
+      registration_url: '',
       status: 'upcoming',
-      focus_statement: 'Solving mission-critical engineering bottlenecks through distributed computing.',
-      description: 'Join top engineering talent to solve real-world problems in high-throughput data processing.',
-      image_url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=1200',
-      banner_url: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=1200',
-      solutions_deployed_count: '25+ Systems',
-      tracks: [
-        { id: 'trk-1', title: 'Sovereign AI', description: 'Fine-tuned LLM architectures and edge inference.' },
-        { id: 'trk-2', title: 'High-Concurrency Systems', description: 'Fault-tolerant distributed transactional pipelines.' }
-      ],
-      problem_statements: [
-        {
-          id: 'prob-1',
-          title: 'Sub-millisecond State Synchronization',
-          category: 'Distributed Systems',
-          description: 'Achieve deterministic state replication under simulated 30% packet loss.',
-          complexity: 'Hard'
-        }
-      ],
-      rules: [
-        'Teams must consist of 2 to 4 eligible developers.',
-        'All code submissions must be licensed or open for architecture review.',
-        'Pre-built closed solutions are disqualified; boilerplate is allowed.'
-      ],
-      prizes: [
-        '1st Place: INR 5,00,000 + Incubation at Ravan Tech Park',
-        '2nd Place: INR 2,50,000 + Cloud Computing Credits',
-        '3rd Place: INR 1,00,000'
-      ],
-      eligibility: 'Open to engineering students, senior developers, and independent researchers worldwide.',
-      contact_info: 'ravantechnologies11@gmail.com',
+      focus_statement: '',
+      description: '',
+      image_url: '',
+      banner_url: '',
+      additional_images: [],
+      solutions_deployed_count: '0 Systems',
+      tracks: [],
+      problem_statements: [],
+      rules: [],
+      prizes: [],
+      eligibility: '',
+      contact_info: 'contact@ravantechnologies.in',
       display_order: hackathons.length + 1,
       winning_solutions: []
     };
@@ -121,8 +104,20 @@ export const AdminHackathons: React.FC = () => {
   const handleSaveModal = async () => {
     if (!editingItem) return;
     if (!editingItem.title.trim()) {
-      showToast('Event title is required.', 'info');
+      showToast('Event title is required.', 'error');
       return;
+    }
+
+    if (editingItem.registration_url) {
+      const regTrimmed = editingItem.registration_url.trim().toLowerCase();
+      if (
+        regTrimmed.startsWith('javascript:') ||
+        regTrimmed.startsWith('data:') ||
+        regTrimmed.startsWith('vbscript:')
+      ) {
+        showToast('Dangerous URL protocol detected in Registration URL.', 'error');
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -176,9 +171,10 @@ export const AdminHackathons: React.FC = () => {
     if (!editingItem) return;
     const newProb: ProblemStatement = {
       id: 'prob-' + Date.now(),
-      title: 'New Engineering Challenge',
-      category: 'System Architecture',
-      description: 'Describe the problem statement and deliverable objectives...',
+      title: '',
+      category: '',
+      domain: '',
+      description: '',
       complexity: 'Medium'
     };
     setEditingItem({
@@ -536,25 +532,93 @@ export const AdminHackathons: React.FC = () => {
                         className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
-                        Banner / Image URL
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={editingItem.banner_url || editingItem.image_url}
-                          onChange={e => setEditingItem({ ...editingItem, banner_url: e.target.value, image_url: e.target.value })}
-                          className="flex-1 px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setIsCropOpen(true)}
-                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded flex items-center gap-1 shrink-0"
-                        >
-                          <Upload className="w-3.5 h-3.5 text-secondary" />
-                          <span>Crop</span>
-                        </button>
+                    <div className="md:col-span-2 space-y-3 pt-2">
+                      {/* Authoritative Frontend Dimensions Notice */}
+                      <div className="bg-[#040810] border border-secondary/30 rounded-xl p-4 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            <Focus className="w-3.5 h-3.5 text-secondary" />
+                            Recommended Frontend Size:
+                          </span>
+                          <span className="text-xs font-mono font-bold text-secondary">1200 × 900 px</span>
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <span className="text-xs font-bold text-slate-300">Authoritative Aspect Ratio:</span>
+                          <span className="text-xs font-mono font-bold text-white">4:3 (Standard)</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-normal pt-1 border-t border-slate-800/80">
+                          Rendered in a 4:3 responsive card on the public Hackathon hero (500×375px desktop, up to 720×540px mobile). High-DPI 1200×900px export normalizes any original resolution without stretching, distortion, or unwanted clipping.
+                        </p>
+                      </div>
+
+                      {/* Live 4:3 Preview Frame & Controls */}
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1.5">
+                          Banner / Hero Image (4:3 Preview)
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                          <div className="md:col-span-5">
+                            {(editingItem.banner_url || editingItem.image_url) ? (
+                              <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-slate-700 bg-slate-900 shadow-md group">
+                                <img
+                                  src={editingItem.banner_url || editingItem.image_url}
+                                  alt="Hackathon Banner Preview"
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsCropOpen(true)}
+                                    className="px-2.5 py-1.5 bg-secondary text-[#0a192f] rounded text-[11px] font-bold uppercase flex items-center gap-1 shadow"
+                                  >
+                                    <Upload className="w-3 h-3" />
+                                    <span>Crop</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingItem({ ...editingItem, banner_url: '', image_url: '' })}
+                                    className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-[11px] font-bold uppercase flex items-center gap-1 shadow"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    <span>Remove</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() => setIsCropOpen(true)}
+                                className="aspect-[4/3] border-2 border-dashed border-slate-700 hover:border-secondary rounded-xl flex flex-col items-center justify-center cursor-pointer transition-colors bg-[#07111e]/60 text-center p-4 group"
+                              >
+                                <Upload className="w-8 h-8 text-slate-500 group-hover:text-secondary mb-2 transition-colors" />
+                                <span className="text-xs font-bold text-white mb-0.5">Upload & Crop 4:3 Banner</span>
+                                <span className="text-[10px] text-slate-400">1200 × 900 px</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="md:col-span-7 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="https://... image URL"
+                                value={editingItem.banner_url || editingItem.image_url}
+                                onChange={e => setEditingItem({ ...editingItem, banner_url: e.target.value, image_url: e.target.value })}
+                                className="flex-1 px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-secondary"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setIsCropOpen(true)}
+                                className="px-3.5 py-2 bg-secondary text-[#0a192f] rounded text-xs font-bold uppercase hover:bg-secondary-fixed transition-colors flex items-center gap-1.5 shadow shrink-0"
+                              >
+                                <Upload className="w-3.5 h-3.5" />
+                                <span>Crop Tool</span>
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              Upload an image of any resolution to crop, zoom, and center on the 4:3 target frame.
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -582,7 +646,52 @@ export const AdminHackathons: React.FC = () => {
               )}
 
               {activeTab === 'problems' && (
-                <div className="space-y-4">
+                <div className="space-y-5">
+                  {/* Active Problem Domains Header & Dynamic Summary */}
+                  {(() => {
+                    const activeDomains = Array.from(new Set(
+                      (editingItem.problem_statements || [])
+                        .map(p => (p.category || p.domain || '').trim())
+                        .filter(Boolean)
+                    ));
+                    return (
+                      <div className="bg-[#07111e] border border-slate-800 rounded-xl p-4 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                          <span className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            <Code2 className="w-4 h-4 text-secondary" />
+                            Selected Problem Domains ({activeDomains.length})
+                          </span>
+                          <span className="text-[10px] text-slate-400">Strictly derived from saved problem statements</span>
+                        </div>
+                        {activeDomains.length === 0 ? (
+                          <p className="text-xs text-slate-500 italic">
+                            No problem domains active yet. Each problem statement's domain will appear here and on the public site automatically.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {activeDomains.map(d => {
+                              const count = (editingItem.problem_statements || []).filter(
+                                p => (p.category || p.domain || '').trim().toLowerCase() === d.toLowerCase()
+                              ).length;
+                              return (
+                                <span
+                                  key={d}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary/10 border border-secondary/30 text-secondary text-xs font-bold"
+                                >
+                                  <span>{d}</span>
+                                  <span className="text-[10px] opacity-75 font-mono">({count})</span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-800/60">
+                          Removing the last problem statement in a domain will automatically remove the domain from the public frontend.
+                        </p>
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-slate-400">
                       Problem statements presented to hackathon teams for enterprise evaluation.
@@ -590,82 +699,102 @@ export const AdminHackathons: React.FC = () => {
                     <button
                       type="button"
                       onClick={handleAddProblem}
-                      className="px-3 py-1.5 bg-secondary text-[#0a192f] rounded text-xs font-bold uppercase flex items-center gap-1"
+                      className="px-3.5 py-1.5 bg-secondary text-[#0a192f] rounded text-xs font-bold uppercase flex items-center gap-1 hover:bg-secondary-fixed transition-colors shadow"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>Add Problem</span>
+                      <span>Add Problem Statement</span>
                     </button>
                   </div>
 
                   {(!editingItem.problem_statements || editingItem.problem_statements.length === 0) ? (
-                    <div className="p-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl">
-                      No problem statements registered yet. Click "Add Problem" to configure.
+                    <div className="p-12 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-xl space-y-2">
+                      <p className="font-semibold text-slate-400">No problem statements registered yet.</p>
+                      <p>Click "Add Problem Statement" to configure a challenge for this event.</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {editingItem.problem_statements.map((prob, pIdx) => (
                         <div key={prob.id || pIdx} className="p-4 bg-[#07111e] border border-slate-800 rounded-xl space-y-3">
                           <div className="flex items-center justify-between gap-3">
-                            <input
-                              type="text"
-                              placeholder="Problem Title"
-                              value={prob.title}
-                              onChange={e => {
-                                const copy = [...editingItem.problem_statements];
-                                copy[pIdx].title = e.target.value;
-                                setEditingItem({ ...editingItem, problem_statements: copy });
-                              }}
-                              className="flex-1 px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs font-bold"
-                            />
-                            <select
-                              value={prob.complexity}
-                              onChange={e => {
-                                const copy = [...editingItem.problem_statements];
-                                copy[pIdx].complexity = e.target.value as any;
-                                setEditingItem({ ...editingItem, problem_statements: copy });
-                              }}
-                              className="px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs"
-                            >
-                              <option value="Easy">Easy</option>
-                              <option value="Medium">Medium</option>
-                              <option value="Hard">Hard</option>
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveProblem(pIdx)}
-                              className="p-1.5 text-slate-500 hover:text-rose-400"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <span className="text-xs font-bold text-secondary font-mono">
+                              #{pIdx + 1} Problem Challenge
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={prob.complexity || 'Medium'}
+                                onChange={e => {
+                                  const copy = [...editingItem.problem_statements];
+                                  copy[pIdx].complexity = e.target.value as any;
+                                  setEditingItem({ ...editingItem, problem_statements: copy });
+                                }}
+                                className="px-2.5 py-1 rounded bg-[#0a192f] border border-slate-700 text-white text-xs"
+                              >
+                                <option value="Easy">Easy</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Hard">Hard</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveProblem(pIdx)}
+                                className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded transition-colors"
+                                title="Delete Problem Statement"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
+                              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                Problem Domain / Category *
+                              </label>
                               <input
                                 type="text"
-                                placeholder="Category (e.g. Distributed Systems)"
-                                value={prob.category}
+                                placeholder="e.g. Distributed Systems"
+                                value={prob.category || prob.domain || ''}
                                 onChange={e => {
                                   const copy = [...editingItem.problem_statements];
                                   copy[pIdx].category = e.target.value;
+                                  copy[pIdx].domain = e.target.value;
                                   setEditingItem({ ...editingItem, problem_statements: copy });
                                 }}
-                                className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs"
+                                className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                               />
                             </div>
                             <div className="md:col-span-2">
-                              <textarea
-                                rows={2}
-                                placeholder="Problem statement technical requirements..."
-                                value={prob.description}
+                              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                Problem Title *
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Sub-millisecond State Synchronization"
+                                value={prob.title}
                                 onChange={e => {
                                   const copy = [...editingItem.problem_statements];
-                                  copy[pIdx].description = e.target.value;
+                                  copy[pIdx].title = e.target.value;
                                   setEditingItem({ ...editingItem, problem_statements: copy });
                                 }}
-                                className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs"
+                                className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs font-bold focus:outline-none focus:border-secondary"
                               />
                             </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                              Technical Description / Objectives
+                            </label>
+                            <textarea
+                              rows={2}
+                              placeholder="Describe technical requirements, expected deliverable architecture, and constraints..."
+                              value={prob.description}
+                              onChange={e => {
+                                const copy = [...editingItem.problem_statements];
+                                copy[pIdx].description = e.target.value;
+                                setEditingItem({ ...editingItem, problem_statements: copy });
+                              }}
+                              className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs leading-relaxed focus:outline-none focus:border-secondary"
+                            />
                           </div>
                         </div>
                       ))}
@@ -675,39 +804,55 @@ export const AdminHackathons: React.FC = () => {
               )}
 
               {activeTab === 'rules' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
-                      Competition Rules (One rule per line)
-                    </label>
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-bold uppercase text-slate-400">
+                        Competition Rules ({editingItem.rules?.length || 0} configured)
+                      </label>
+                      <span className="text-[10px] text-slate-500">One rule per line</span>
+                    </div>
                     <textarea
-                      rows={4}
+                      rows={5}
                       value={(editingItem.rules || []).join('\n')}
-                      onChange={e =>
+                      onChange={e => {
+                        const lines = e.target.value.split('\n').map(l => l.trim()).filter(Boolean);
                         setEditingItem({
                           ...editingItem,
-                          rules: e.target.value.split('\n').filter(Boolean)
-                        })
-                      }
-                      className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs leading-relaxed font-mono"
+                          rules: lines
+                        });
+                      }}
+                      placeholder="Enter each rule on a new line...&#10;Teams must consist of 2 to 4 eligible developers.&#10;All code submissions must be licensed for architecture review.&#10;Pre-built closed solutions are disqualified."
+                      className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs leading-relaxed font-mono focus:outline-none focus:border-secondary"
                     />
+                    <p className="text-[11px] text-slate-500">
+                      Deleting all rules and saving will permanently remove them from the public page. No default rules will regenerate.
+                    </p>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
-                      Prizes & Recognition (One prize tier per line)
-                    </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[10px] font-bold uppercase text-slate-400">
+                        Prizes & Recognition ({editingItem.prizes?.length || 0} configured)
+                      </label>
+                      <span className="text-[10px] text-slate-500">One prize tier per line</span>
+                    </div>
                     <textarea
-                      rows={4}
+                      rows={5}
                       value={(editingItem.prizes || []).join('\n')}
-                      onChange={e =>
+                      onChange={e => {
+                        const lines = e.target.value.split('\n').map(l => l.trim()).filter(Boolean);
                         setEditingItem({
                           ...editingItem,
-                          prizes: e.target.value.split('\n').filter(Boolean)
-                        })
-                      }
-                      className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs leading-relaxed font-mono"
+                          prizes: lines
+                        });
+                      }}
+                      placeholder="Enter each prize tier on a new line...&#10;1st Place: INR 5,00,000 + Incubation at Ravan Tech Park&#10;2nd Place: INR 2,50,000 + Cloud Computing Credits&#10;3rd Place: INR 1,00,000"
+                      className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs leading-relaxed font-mono focus:outline-none focus:border-secondary"
                     />
+                    <p className="text-[11px] text-slate-500">
+                      Deleting all prizes and saving will permanently remove them from the public page. No default prizes will regenerate.
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -719,7 +864,8 @@ export const AdminHackathons: React.FC = () => {
                         type="text"
                         value={editingItem.eligibility || ''}
                         onChange={e => setEditingItem({ ...editingItem, eligibility: e.target.value })}
-                        className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs"
+                        placeholder="e.g. Open to developers and researchers worldwide."
+                        className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                       />
                     </div>
                     <div>
@@ -730,7 +876,8 @@ export const AdminHackathons: React.FC = () => {
                         type="text"
                         value={editingItem.contact_info || ''}
                         onChange={e => setEditingItem({ ...editingItem, contact_info: e.target.value })}
-                        className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs"
+                        placeholder="e.g. contact@ravantechnologies.in"
+                        className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                       />
                     </div>
                   </div>
@@ -751,7 +898,7 @@ export const AdminHackathons: React.FC = () => {
                 type="button"
                 onClick={handleSaveModal}
                 disabled={isSaving}
-                className="px-5 py-2 bg-secondary text-[#0a192f] rounded text-xs font-bold uppercase hover:bg-secondary-fixed transition-colors flex items-center gap-1.5 shadow"
+                className="px-5 py-2 bg-secondary text-[#0a192f] rounded text-xs font-bold uppercase hover:bg-secondary-fixed transition-colors flex items-center gap-1.5 shadow disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 <span>{isSaving ? 'Saving...' : 'Save Event'}</span>
@@ -766,9 +913,13 @@ export const AdminHackathons: React.FC = () => {
         isOpen={isCropOpen}
         onClose={() => setIsCropOpen(false)}
         onConfirm={handleCropResult}
-        aspectRatioLabel="16:9 (Landscape)"
+        aspectRatioLabel="4:3 (Standard)"
         targetBucket="ecosystem"
         targetFolder="hackathons"
+        title="Crop Hackathon Banner / Hero Image"
+        recommendedWidth={1200}
+        recommendedHeight={900}
+        recommendedNote="Authoritative 4:3 crop for Hackathon Hero & Home spotlight. Prevents image distortion and ensures crisp presentation across all retina screens."
       />
 
       {/* Delete Confirmation Modal */}

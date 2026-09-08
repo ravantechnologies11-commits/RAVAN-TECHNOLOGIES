@@ -18,20 +18,30 @@ import {
 import { Link } from 'react-router-dom';
 
 export const AIMLPage: React.FC = () => {
-  const [models, setModels] = useState<AIMLModel[]>(() => dataService.getAIMLModelsSync());
+  const [models, setModels] = useState<AIMLModel[] | null>(() => dataService.getCachedAIMLModels());
+  const [loading, setLoading] = useState<boolean>(() => dataService.getCachedAIMLModels() === null);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getAIMLModels().then(data => {
-      if (isMounted && data && data.length > 0) {
-        setModels(data);
+      if (isMounted) {
+        setModels(data || []);
+        setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) {
+        setModels([]);
+        setLoading(false);
+      }
+    });
 
     const handleUpdate = () => {
       dataService.getAIMLModels(true).then(data => {
-        if (isMounted && data) setModels(data);
+        if (isMounted) {
+          setModels(data || []);
+          setLoading(false);
+        }
       });
     };
 
@@ -140,7 +150,22 @@ export const AIMLPage: React.FC = () => {
           </p>
         </div>
 
-        {publishedModels.length > 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8" aria-busy="true">
+            {[1, 2].map(i => (
+              <div key={i} className="p-8 rounded-2xl bg-surface border border-outline-variant animate-pulse space-y-6">
+                <div className="flex justify-between">
+                  <div className="h-5 w-24 bg-slate-700/60 rounded" />
+                  <div className="h-4 w-20 bg-slate-700/60 rounded" />
+                </div>
+                <div className="h-8 w-3/4 bg-slate-800 rounded" />
+                <div className="h-4 w-full bg-slate-800/60 rounded" />
+                <div className="h-4 w-2/3 bg-slate-800/60 rounded" />
+                <div className="h-10 w-full bg-slate-800/40 rounded-xl" />
+              </div>
+            ))}
+          </div>
+        ) : publishedModels.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {publishedModels.map(model => (
               <div

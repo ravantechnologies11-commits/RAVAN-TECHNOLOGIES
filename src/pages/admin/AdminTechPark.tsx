@@ -26,13 +26,39 @@ export const AdminTechPark: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'general' | 'facilities' | 'features' | 'gallery'>('general');
   const [isCropOpen, setIsCropOpen] = useState(false);
 
+  const defaultTechPark: EcosystemItem = {
+    id: 'eco-techpark',
+    name: 'Ravan Tech Park',
+    tagline: '120,000+ sq ft Enterprise Innovation Campus',
+    description: 'A physical high-compute campus built for enterprise software engineering, sovereign AI research, and high-throughput collaboration.',
+    type: 'hub',
+    image_url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80',
+    metrics: {
+      value: '120,000+ SQ FT',
+      label: 'CAMPUS FOOTPRINT',
+      sublabel: 'Dedicated High-Compute Infrastructure'
+    },
+    features: [
+      { title: 'Supercomputing Enclaves', description: 'Private hardware compute facilities', icon: 'server' },
+      { title: 'Redundant Power & Fiber', description: 'Dual tier-3 feeds with battery backup', icon: 'zap' }
+    ],
+    specifications: [
+      '120,000+ sq ft physical campus footprint',
+      'Dual-redundant multi-gigabit fiber connections',
+      'Dedicated private server rooms & hardware testing labs',
+      'Secure biometric access & 24/7 technical surveillance'
+    ],
+    status_badge: 'OPERATIONAL',
+    display_order: 1
+  };
+
   useEffect(() => {
     dataService.getEcosystem().then(items => {
-      const tp = items.find(i => i.type === 'hub') || items[0] || initialEcosystem[0];
+      const tp = items.find(i => i.type === 'hub') || items[0] || defaultTechPark;
       setTechPark(JSON.parse(JSON.stringify(tp)));
       setLoading(false);
     }).catch(() => {
-      setTechPark(JSON.parse(JSON.stringify(initialEcosystem[0])));
+      setTechPark(JSON.parse(JSON.stringify(defaultTechPark)));
       setLoading(false);
     });
   }, []);
@@ -44,7 +70,10 @@ export const AdminTechPark: React.FC = () => {
     setIsSaving(true);
     try {
       const all = await dataService.getEcosystem();
-      const updated = all.map(item => (item.id === techPark.id ? techPark : item));
+      const exists = all.some(item => item.id === techPark.id);
+      const updated = exists 
+        ? all.map(item => (item.id === techPark.id ? techPark : item))
+        : [...all, techPark];
       await dataService.saveEcosystem(updated);
       showToast('Ravan Tech Park campus specifications saved.', 'success');
     } catch (err) {

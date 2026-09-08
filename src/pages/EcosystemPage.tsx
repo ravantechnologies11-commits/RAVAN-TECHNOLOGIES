@@ -4,25 +4,33 @@ import { SEOHead } from '../components/common/SEOHead';
 import { SmartImage } from '../components/common/SmartImage';
 import { dataService } from '../lib/dataService';
 import { EcosystemItem } from '../types';
-import { initialEcosystem } from '../data/initialData';
 import { Building2, Clapperboard, CheckCircle2, ArrowRight, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const EcosystemPage: React.FC = () => {
-  const [items, setItems] = useState<EcosystemItem[]>(() => dataService.getEcosystemSync());
-  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<EcosystemItem[] | null>(() => dataService.getCachedEcosystem());
+  const [loading, setLoading] = useState<boolean>(() => dataService.getCachedEcosystem() === null);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getEcosystem().then((data) => {
-      if (isMounted && data) {
-        setItems(data);
+      if (isMounted) {
+        setItems(data || []);
+        setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) {
+        setItems([]);
+        setLoading(false);
+      }
+    });
 
     const handleUpdate = () => {
-      dataService.getEcosystem().then((data) => {
-        if (isMounted) setItems(data);
+      dataService.getEcosystem(true).then((data) => {
+        if (isMounted) {
+          setItems(data || []);
+          setLoading(false);
+        }
       });
     };
     window.addEventListener('ravan_data_updated', handleUpdate);
@@ -32,8 +40,9 @@ export const EcosystemPage: React.FC = () => {
     };
   }, []);
 
-  const techPark = items ? (items.find(i => i.type === 'hub') || items[0]) : null;
-  const filmStudio = items ? (items.find(i => i.type === 'studio') || items[1]) : null;
+  const activeItems = items || [];
+  const techPark = activeItems.find(i => i.type === 'hub') || (activeItems.length > 0 ? activeItems[0] : null);
+  const filmStudio = activeItems.find(i => i.type === 'studio') || (activeItems.length > 1 ? activeItems[1] : null);
 
   return (
     <Layout>
@@ -56,7 +65,7 @@ export const EcosystemPage: React.FC = () => {
         </h1>
       </section>
 
-      {loading || !items ? (
+      {loading ? (
         <section className="w-full max-w-container-max mx-auto px-gutter pb-28 space-y-20 animate-pulse" aria-busy="true">
           <div className="p-8 md:p-12 rounded-2xl bg-surface border border-outline-variant grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-7 space-y-4">
@@ -75,6 +84,23 @@ export const EcosystemPage: React.FC = () => {
               <div className="h-20 bg-slate-800/40 rounded-xl" />
             </div>
             <div className="lg:col-span-5 h-72 bg-slate-800/50 rounded-xl" />
+          </div>
+        </section>
+      ) : activeItems.length === 0 ? (
+        <section className="w-full max-w-container-max mx-auto px-gutter pb-28">
+          <div className="p-16 rounded-2xl bg-surface border border-outline-variant/70 text-center max-w-xl mx-auto my-12">
+            <Building2 className="w-12 h-12 text-secondary/60 mx-auto mb-4" />
+            <h3 className="text-xl font-bold font-display text-primary mb-2">Ecosystem Facilities Under Active Expansion</h3>
+            <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+              Specifications for the Ravan Tech Park R&D Campus and Virtual Production Studios are currently being updated. Inquire directly for commercial leases and virtual volume bookings.
+            </p>
+            <Link
+              to="/contact"
+              className="inline-flex items-center gap-2 px-6 py-3.5 bg-primary text-white text-xs font-semibold tracking-widest uppercase rounded hover:bg-primary-container transition-all shadow-md"
+            >
+              <span>INQUIRE ECOSYSTEM PARTNERSHIPS</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </section>
       ) : (

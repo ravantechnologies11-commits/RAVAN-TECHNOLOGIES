@@ -1010,8 +1010,29 @@ export function mapSolutionForDb(sol: SolutionItem) {
 export function normalizeHackathon(raw: any, idx: number = 0): HackathonItem {
   if (!raw) {
     return {
-      ...initialHackathon,
-      id: `hackathon-${Date.now()}-${idx}`
+      id: `hackathon-${Date.now()}-${idx}`,
+      title: '',
+      edition: `Edition ${idx + 1}.0`,
+      subtitle: '',
+      event_date: '',
+      time: '',
+      location: '',
+      registration_url: '',
+      status: 'upcoming',
+      focus_statement: '',
+      description: '',
+      image_url: '',
+      banner_url: '',
+      additional_images: [],
+      solutions_deployed_count: '0',
+      tracks: [],
+      problem_statements: [],
+      rules: [],
+      prizes: [],
+      eligibility: '',
+      contact_info: '',
+      display_order: idx + 1,
+      winning_solutions: []
     };
   }
 
@@ -1020,84 +1041,64 @@ export function normalizeHackathon(raw: any, idx: number = 0): HackathonItem {
     ? raw.faq
     : (raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {});
 
-  const cleanTitle = raw.title || meta.title || 'National Enterprise Hackathon';
-  const cleanEdition = raw.edition || meta.edition || `Vol. ${idx + 1}`;
-  const cleanSubtitle = raw.subtitle || meta.subtitle || raw.theme || '';
-  const cleanEventDate = raw.event_date || meta.event_date || raw.event_dates || 'November 15-17, 2026';
-  const cleanTime = raw.time || meta.time || '09:00 AM - 06:00 PM IST';
-  const cleanLocation = raw.location || meta.location || 'Ravan Tech Park, Thiruvannamalai & Virtual';
-  const cleanRegUrl = raw.registration_url || meta.registration_url || 'https://ravantechnologies.in/hackathons/register';
+  const cleanTitle = raw.title ?? meta.title ?? '';
+  const cleanEdition = raw.edition ?? meta.edition ?? `Vol. ${idx + 1}`;
+  const cleanSubtitle = raw.subtitle ?? meta.subtitle ?? raw.theme ?? '';
+  const cleanEventDate = raw.event_date ?? meta.event_date ?? raw.event_dates ?? '';
+  const cleanTime = raw.time ?? meta.time ?? '';
+  const cleanLocation = raw.location ?? meta.location ?? '';
+  const cleanRegUrl = raw.registration_url ?? meta.registration_url ?? '';
 
-  // Status mapping
+  // Status mapping - STRICT: preserve exact status, do NOT convert draft to upcoming!
   let status: 'upcoming' | 'live' | 'completed' | 'draft' = 'upcoming';
-  if (raw.status && ['upcoming', 'live', 'completed', 'draft'].includes(raw.status)) {
-    status = raw.status;
-  } else if (meta.status && ['upcoming', 'live', 'completed', 'draft'].includes(meta.status)) {
-    status = meta.status;
-  } else if (raw.is_registration_open === false) {
-    status = 'completed';
+  const rawStatus = raw.status || meta.status;
+  if (rawStatus && ['upcoming', 'live', 'completed', 'draft'].includes(rawStatus)) {
+    status = rawStatus;
   }
 
-  const focusStatement = raw.focus_statement || meta.focus_statement || raw.theme || 'Solving mission-critical engineering bottlenecks through distributed computing.';
-  const description = raw.description || meta.description || 'Join top engineering talent to solve real-world problems in high-throughput data processing.';
-  const imageUrl = raw.image_url || meta.image_url || 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=1200';
-  const bannerUrl = raw.banner_url || meta.banner_url || imageUrl;
+  const focusStatement = raw.focus_statement ?? meta.focus_statement ?? raw.theme ?? '';
+  const description = raw.description ?? meta.description ?? '';
+  const imageUrl = raw.image_url ?? meta.image_url ?? '';
+  const bannerUrl = raw.banner_url ?? meta.banner_url ?? imageUrl;
   const additionalImages = Array.isArray(raw.additional_images) ? raw.additional_images : (Array.isArray(meta.additional_images) ? meta.additional_images : []);
-  const solutionsDeployed = raw.solutions_deployed_count || meta.solutions_deployed_count || '25+ Systems';
+  const solutionsDeployed = raw.solutions_deployed_count ?? meta.solutions_deployed_count ?? '0';
 
-  // Tracks: can come from raw.tracks
+  // Tracks: ONLY from raw or meta, NEVER fallback to fake demo tracks!
   let tracks: HackathonTrack[] = [];
-  if (Array.isArray(raw.tracks) && raw.tracks.length > 0) {
+  if (Array.isArray(raw.tracks)) {
     tracks = raw.tracks;
-  } else if (Array.isArray(meta.tracks) && meta.tracks.length > 0) {
+  } else if (Array.isArray(meta.tracks)) {
     tracks = meta.tracks;
-  } else {
-    tracks = [
-      { id: 'trk-1', title: 'Sovereign AI', description: 'Fine-tuned LLM architectures and edge inference.' },
-      { id: 'trk-2', title: 'High-Concurrency Systems', description: 'Fault-tolerant distributed transactional pipelines.' }
-    ];
   }
 
-  // Problem Statements
+  // Problem Statements: ONLY from raw or meta, NEVER fallback to fake demo statements!
   let problemStatements: ProblemStatement[] = [];
-  if (Array.isArray(raw.problem_statements) && raw.problem_statements.length > 0) {
+  if (Array.isArray(raw.problem_statements)) {
     problemStatements = raw.problem_statements;
-  } else if (Array.isArray(meta.problem_statements) && meta.problem_statements.length > 0) {
+  } else if (Array.isArray(meta.problem_statements)) {
     problemStatements = meta.problem_statements;
   }
 
-  // Rules
+  // Rules: ONLY from raw or meta, NEVER fallback to fake demo rules!
   let rules: string[] = [];
-  if (Array.isArray(raw.rules) && raw.rules.length > 0) {
+  if (Array.isArray(raw.rules)) {
     rules = raw.rules;
-  } else if (Array.isArray(meta.rules) && meta.rules.length > 0) {
+  } else if (Array.isArray(meta.rules)) {
     rules = meta.rules;
-  } else {
-    rules = [
-      'Teams must consist of 2 to 4 eligible developers.',
-      'All code submissions must be licensed or open for architecture review.',
-      'Pre-built closed solutions are disqualified; boilerplate is allowed.'
-    ];
   }
 
-  // Prizes
+  // Prizes: ONLY from raw or meta, NEVER fallback to fake demo prizes!
   let prizes: string[] = [];
-  if (Array.isArray(raw.prizes) && raw.prizes.length > 0) {
+  if (Array.isArray(raw.prizes)) {
     prizes = raw.prizes;
-  } else if (Array.isArray(meta.prizes) && meta.prizes.length > 0) {
+  } else if (Array.isArray(meta.prizes)) {
     prizes = meta.prizes;
-  } else if (raw.prize_pool) {
-    prizes = [String(raw.prize_pool)];
-  } else {
-    prizes = [
-      '1st Place: INR 5,00,000 + Incubation at Ravan Tech Park',
-      '2nd Place: INR 2,50,000 + Cloud Computing Credits',
-      '3rd Place: INR 1,00,000'
-    ];
+  } else if (raw.prize_pool && typeof raw.prize_pool === 'string' && raw.prize_pool.trim() && raw.prize_pool !== '[]') {
+    prizes = raw.prize_pool.split(';').map((p: string) => p.trim()).filter(Boolean);
   }
 
-  const eligibility = raw.eligibility || meta.eligibility || 'Open to engineering students, senior developers, and independent researchers worldwide.';
-  const contactInfo = raw.contact_info || meta.contact_info || 'ravantechnologies11@gmail.com';
+  const eligibility = raw.eligibility ?? meta.eligibility ?? '';
+  const contactInfo = raw.contact_info ?? meta.contact_info ?? '';
   const displayOrder = typeof raw.display_order === 'number' ? raw.display_order : (typeof meta.display_order === 'number' ? meta.display_order : idx + 1);
   const winningSolutions: WinningSolution[] = Array.isArray(raw.winning_solutions) ? raw.winning_solutions : (Array.isArray(meta.winning_solutions) ? meta.winning_solutions : []);
 
@@ -1138,7 +1139,7 @@ export function mapHackathonForDb(h: HackathonItem) {
     time: h.time || '',
     location: h.location || '',
     registration_url: h.registration_url || '',
-    status: h.status === 'draft' ? 'upcoming' : h.status,
+    status: h.status,
     focus_statement: h.focus_statement,
     description: h.description,
     image_url: h.image_url,
@@ -1171,6 +1172,7 @@ export function mapHackathonForLegacyDb(h: HackathonItem) {
     additional_images: Array.isArray(h.additional_images) ? h.additional_images : [],
     solutions_deployed_count: h.solutions_deployed_count,
     problem_statements: Array.isArray(h.problem_statements) ? h.problem_statements : [],
+    rules: Array.isArray(h.rules) ? h.rules : [],
     prizes: Array.isArray(h.prizes) ? h.prizes : [],
     eligibility: h.eligibility || '',
     contact_info: h.contact_info || '',
@@ -1183,9 +1185,9 @@ export function mapHackathonForLegacyDb(h: HackathonItem) {
     title: h.title,
     edition: h.edition,
     theme: h.focus_statement || h.subtitle || h.title,
-    registration_deadline: h.event_date || 'TBA',
-    event_dates: h.event_date || 'TBA',
-    prize_pool: Array.isArray(h.prizes) ? h.prizes.join('; ') : (typeof h.prizes === 'string' ? h.prizes : 'INR 8,50,000'),
+    registration_deadline: h.event_date || '',
+    event_dates: h.event_date || '',
+    prize_pool: Array.isArray(h.prizes) && h.prizes.length > 0 ? h.prizes.join('; ') : '',
     tracks: Array.isArray(h.tracks) ? h.tracks : [],
     rules: Array.isArray(h.rules) ? h.rules : [],
     faq: packedMeta,
@@ -1662,88 +1664,105 @@ export const dataService = {
     return null;
   },
 
+  // --- CACHED GETTERS FOR ZERO-FLASH HYDRATION ---
+  getCachedServices(): ServiceItem[] | null {
+    const entry = memoryCache.getEntry<ServiceItem[]>('services');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: ServiceItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_services', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
+  },
+
   getServicesSync(): ServiceItem[] {
-    const cached = memoryCache.get<ServiceItem[]>('services');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<ServiceItem[]>('ravan_services', initialServices);
-    const source = (Array.isArray(local) && local.length > 0) ? local : initialServices;
-    const mapped = source.map((item, idx) => normalizeService(item, idx));
-    mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-    memoryCache.set('services', mapped);
-    return mapped;
+    return this.getCachedServices() || [];
+  },
+
+  getCachedSolutions(): SolutionItem[] | null {
+    const entry = memoryCache.getEntry<SolutionItem[]>('solutions');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: SolutionItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_solutions', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return initialSolutions;
   },
 
   getSolutionsSync(): SolutionItem[] {
-    const cached = memoryCache.get<SolutionItem[]>('solutions');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<SolutionItem[]>('ravan_solutions', initialSolutions);
-    const source = (Array.isArray(local) && local.length > 0) ? local : initialSolutions;
-    const mapped = source.map((item, idx) => normalizeSolution(item, idx));
-    mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-    memoryCache.set('solutions', mapped);
-    return mapped;
+    return this.getCachedSolutions() || initialSolutions;
+  },
+
+  getCachedProjects(): ProjectItem[] | null {
+    const entry = memoryCache.getEntry<ProjectItem[]>('projects');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: ProjectItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_projects', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
   },
 
   getProjectsSync(): ProjectItem[] {
-    const cached = memoryCache.get<ProjectItem[]>('projects');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<ProjectItem[]>('ravan_projects', initialProjects);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialProjects;
-    memoryCache.set('projects', result);
-    return result;
+    return this.getCachedProjects() || [];
+  },
+
+  getCachedHackathons(): HackathonItem[] | null {
+    const entry = memoryCache.getEntry<HackathonItem[]>('hackathons_list');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: HackathonItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_hackathons_list', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
   },
 
   getHackathonsSync(): HackathonItem[] {
-    const cached = memoryCache.getData<HackathonItem[]>('hackathons_list');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<HackathonItem[]>('ravan_hackathons_list', []);
-    if (Array.isArray(local) && local.length > 0) {
-      memoryCache.set('hackathons_list', local, false);
-      return local;
+    return this.getCachedHackathons() || [];
+  },
+
+  getCachedHackathon(): HackathonItem | null {
+    const list = this.getCachedHackathons();
+    if (list && list.length > 0) {
+      return list.find(h => h.status !== 'draft') || null;
     }
-    return [];
+    const entry = memoryCache.getEntry<HackathonItem>('hackathon');
+    if (entry && entry.isDbVerified && entry.data && entry.data.status !== 'draft') return entry.data;
+    const meta = getLocal<{ timestamp: number; data: HackathonItem; isDbVerified?: boolean } | null>('ravan_cache_meta_hackathon', null);
+    if (meta && meta.isDbVerified && meta.data && meta.data.status !== 'draft') return meta.data;
+    return null;
   },
 
   getHackathonSync(): HackathonItem | null {
-    const list = this.getHackathonsSync();
-    if (list.length > 0) {
-      return list.find(h => h.status !== 'draft') || list[0];
-    }
-    const cachedSingle = memoryCache.getData<HackathonItem>('hackathon');
-    if (cachedSingle) return cachedSingle;
-    const localSingle = getLocal<HackathonItem | null>('ravan_hackathon', null);
-    if (localSingle) {
-      memoryCache.set('hackathon', localSingle, false);
-      return localSingle;
-    }
+    return this.getCachedHackathon();
+  },
+
+  getCachedLearningPrograms(): LearningProgram[] | null {
+    const entry = memoryCache.getEntry<LearningProgram[]>('learning');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: LearningProgram[]; isDbVerified?: boolean } | null>('ravan_cache_meta_learning', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
     return null;
   },
 
   getLearningProgramsSync(): LearningProgram[] {
-    const cached = memoryCache.get<LearningProgram[]>('learning');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<LearningProgram[]>('ravan_learning', initialLearningPrograms);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialLearningPrograms;
-    memoryCache.set('learning', result);
-    return result;
+    return this.getCachedLearningPrograms() || [];
+  },
+
+  getCachedEcosystem(): EcosystemItem[] | null {
+    const entry = memoryCache.getEntry<EcosystemItem[]>('ecosystem');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: EcosystemItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_ecosystem', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
   },
 
   getEcosystemSync(): EcosystemItem[] {
-    const cached = memoryCache.get<EcosystemItem[]>('ecosystem');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<EcosystemItem[]>('ravan_ecosystem', initialEcosystem);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialEcosystem;
-    memoryCache.set('ecosystem', result);
-    return result;
+    return this.getCachedEcosystem() || [];
+  },
+
+  getCachedAIMLModels(): AIMLModel[] | null {
+    const entry = memoryCache.getEntry<AIMLModel[]>('aiml_models');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: AIMLModel[]; isDbVerified?: boolean } | null>('ravan_cache_meta_aiml_models', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
   },
 
   getAIMLModelsSync(): AIMLModel[] {
-    const cached = memoryCache.get<AIMLModel[]>('aiml_models');
-    if (cached && Array.isArray(cached)) return cached;
-    const local = getLocal<AIMLModel[]>('ravan_aiml_models', []);
-    const result = (Array.isArray(local) && local.length > 0) ? local : [];
-    memoryCache.set('aiml_models', result);
-    return result;
+    return this.getCachedAIMLModels() || [];
   },
 
   getSEOSettingsSync(): SEOSettings {
@@ -1755,58 +1774,76 @@ export const dataService = {
     return result;
   },
 
+  getCachedBlogPosts(): BlogPost[] | null {
+    const entry = memoryCache.getEntry<BlogPost[]>('blog');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: BlogPost[]; isDbVerified?: boolean } | null>('ravan_cache_meta_blog', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
+  },
+
   getBlogPostsSync(): BlogPost[] {
-    const cached = memoryCache.get<BlogPost[]>('blog');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<BlogPost[]>('ravan_blog_posts', initialBlogPosts);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialBlogPosts;
-    memoryCache.set('blog', result);
-    return result;
+    return this.getCachedBlogPosts() || [];
+  },
+
+  getCachedEvents(): EventItem[] | null {
+    const entry = memoryCache.getEntry<EventItem[]>('events');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: EventItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_events', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
   },
 
   getEventsSync(): EventItem[] {
-    const cached = memoryCache.get<EventItem[]>('events');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<EventItem[]>('ravan_events', initialEvents);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialEvents;
-    memoryCache.set('events', result);
-    return result;
+    return this.getCachedEvents() || [];
+  },
+
+  getCachedGalleryAlbums(): GalleryAlbum[] | null {
+    const entry = memoryCache.getEntry<GalleryAlbum[]>('gallery');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: GalleryAlbum[]; isDbVerified?: boolean } | null>('ravan_cache_meta_gallery', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
   },
 
   getGalleryAlbumsSync(): GalleryAlbum[] {
-    const cached = memoryCache.get<GalleryAlbum[]>('gallery');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<GalleryAlbum[]>('ravan_gallery_albums', initialGalleryAlbums);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialGalleryAlbums;
-    memoryCache.set('gallery', result);
-    return result;
+    return this.getCachedGalleryAlbums() || [];
+  },
+
+  getCachedTestimonials(): TestimonialItem[] | null {
+    const entry = memoryCache.getEntry<TestimonialItem[]>('testimonials');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: TestimonialItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_testimonials', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
   },
 
   getTestimonialsSync(): TestimonialItem[] {
-    const cached = memoryCache.get<TestimonialItem[]>('testimonials');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<TestimonialItem[]>('ravan_testimonials', initialTestimonials);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialTestimonials;
-    memoryCache.set('testimonials', result);
-    return result;
+    return this.getCachedTestimonials() || [];
+  },
+
+  getCachedPartners(): PartnerItem[] | null {
+    const entry = memoryCache.getEntry<PartnerItem[]>('partners');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: PartnerItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_partners', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return initialPartners;
   },
 
   getPartnersSync(): PartnerItem[] {
-    const cached = memoryCache.get<PartnerItem[]>('partners');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<PartnerItem[]>('ravan_partners', initialPartners);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialPartners;
-    memoryCache.set('partners', result);
-    return result;
+    return this.getCachedPartners() || initialPartners;
+  },
+
+  getCachedClients(): ClientItem[] | null {
+    const entry = memoryCache.getEntry<ClientItem[]>('clients');
+    if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
+    const meta = getLocal<{ timestamp: number; data: ClientItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_clients', null);
+    if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
+    return null;
   },
 
   getClientsSync(): ClientItem[] {
-    const cached = memoryCache.get<ClientItem[]>('clients');
-    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<ClientItem[]>('ravan_clients', initialClients);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialClients;
-    memoryCache.set('clients', result);
-    return result;
+    return this.getCachedClients() || [];
   },
 
   getNavigationSync(): NavigationItem[] {
@@ -2357,7 +2394,6 @@ export const dataService = {
   // --- SERVICES ---
   async getServices(forceRefresh: boolean = false): Promise<ServiceItem[]> {
     return memoryCache.swrFetch('services', async () => {
-      const local = getLocal<ServiceItem[]>('ravan_services', initialServices);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('services').select('*').order('display_order').limit(100);
@@ -2370,7 +2406,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getServices fallback:', err);
       }
-      return (Array.isArray(local) && local.length > 0 ? local : initialServices).map((item, idx) => normalizeService(item, idx));
+      const verified = memoryCache.getEntry<ServiceItem[]>('services');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 
@@ -2425,7 +2465,6 @@ export const dataService = {
   // --- SOLUTIONS ---
   async getSolutions(forceRefresh: boolean = false): Promise<SolutionItem[]> {
     return memoryCache.swrFetch('solutions', async () => {
-      const local = getLocal<SolutionItem[]>('ravan_solutions', initialSolutions);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('solutions').select('*').order('display_order').limit(100);
@@ -2438,7 +2477,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getSolutions fallback:', err);
       }
-      return (Array.isArray(local) && local.length > 0 ? local : initialSolutions).map((item, idx) => normalizeSolution(item, idx));
+      const verified = memoryCache.getEntry<SolutionItem[]>('solutions');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return initialSolutions.map((item, idx) => normalizeSolution(item, idx));
     }, { forceRefresh });
   },
 
@@ -2493,7 +2536,6 @@ export const dataService = {
   // --- PROJECTS ---
   async getProjects(forceRefresh: boolean = false): Promise<ProjectItem[]> {
     return memoryCache.swrFetch('projects', async () => {
-      const local = getLocal<ProjectItem[]>('ravan_projects', initialProjects);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('projects').select('*').order('display_order').limit(100);
@@ -2505,7 +2547,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getProjects fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialProjects;
+      const verified = memoryCache.getEntry<ProjectItem[]>('projects');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 
@@ -2555,7 +2601,7 @@ export const dataService = {
   // --- HACKATHONS ---
   async getHackathon(forceRefresh: boolean = false): Promise<HackathonItem | null> {
     const list = await this.getHackathons(forceRefresh);
-    const found = list.find(h => h.status !== 'draft') || list[0];
+    const found = list.find(h => h.status !== 'draft');
     return found || null;
   },
 
@@ -2714,7 +2760,6 @@ export const dataService = {
   // --- LEARNING PROGRAMS ---
   async getLearningPrograms(forceRefresh: boolean = false): Promise<LearningProgram[]> {
     return memoryCache.swrFetch('learning', async () => {
-      const local = getLocal<LearningProgram[]>('ravan_learning', initialLearningPrograms);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('learning_programs').select('*').order('display_order').limit(100);
@@ -2727,7 +2772,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getLearningPrograms fallback:', err);
       }
-      return (Array.isArray(local) && local.length > 0) ? local.map((d, idx) => normalizeLearningProgram(d, idx)) : initialLearningPrograms;
+      const verified = memoryCache.getEntry<LearningProgram[]>('learning');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 
@@ -2918,7 +2967,6 @@ export const dataService = {
   // --- ECOSYSTEM ---
   async getEcosystem(forceRefresh: boolean = false): Promise<EcosystemItem[]> {
     return memoryCache.swrFetch('ecosystem', async () => {
-      const local = getLocal<EcosystemItem[]>('ravan_ecosystem', initialEcosystem);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('ecosystem').select('*');
@@ -2930,7 +2978,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getEcosystem fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialEcosystem;
+      const verified = memoryCache.getEntry<EcosystemItem[]>('ecosystem');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 
@@ -2979,7 +3031,6 @@ export const dataService = {
   // --- MEDIA ---
   async getMedia(forceRefresh: boolean = false): Promise<MediaItem[]> {
     return memoryCache.swrFetch('media', async () => {
-      const local = getLocal<MediaItem[]>('ravan_media', initialMedia);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('media').select('*').order('created_at', { ascending: false }).limit(100);
@@ -2991,7 +3042,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getMedia fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialMedia;
+      const verified = memoryCache.getEntry<MediaItem[]>('media');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 
@@ -3467,7 +3522,6 @@ export const dataService = {
   // --- GALLERY ALBUMS ---
   async getGalleryAlbums(forceRefresh: boolean = false): Promise<GalleryAlbum[]> {
     return memoryCache.swrFetch('gallery', async () => {
-      const local = getLocal<GalleryAlbum[]>('ravan_gallery_albums', initialGalleryAlbums);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('gallery_albums').select('*').order('display_order').limit(100);
@@ -3479,7 +3533,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getGalleryAlbums fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialGalleryAlbums;
+      const verified = memoryCache.getEntry<GalleryAlbum[]>('gallery');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 
@@ -3542,7 +3600,6 @@ export const dataService = {
   // --- BLOG POSTS ---
   async getBlogPosts(forceRefresh: boolean = false): Promise<BlogPost[]> {
     return memoryCache.swrFetch('blog', async () => {
-      const local = getLocal<BlogPost[]>('ravan_blog_posts', initialBlogPosts);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('blog_posts').select('*').order('published_at', { ascending: false }).limit(100);
@@ -3554,7 +3611,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getBlogPosts fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialBlogPosts;
+      const verified = memoryCache.getEntry<BlogPost[]>('blog');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 
@@ -3603,7 +3664,6 @@ export const dataService = {
   // --- EVENTS ---
   async getEvents(forceRefresh: boolean = false): Promise<EventItem[]> {
     return memoryCache.swrFetch('events', async () => {
-      const local = getLocal<EventItem[]>('ravan_events', initialEvents);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('events').select('*').order('event_date', { ascending: true }).limit(50);
@@ -3615,7 +3675,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getEvents fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialEvents;
+      const verified = memoryCache.getEntry<EventItem[]>('events');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 
@@ -3664,7 +3728,6 @@ export const dataService = {
   // --- TESTIMONIALS ---
   async getTestimonials(forceRefresh: boolean = false): Promise<TestimonialItem[]> {
     return memoryCache.swrFetch('testimonials', async () => {
-      const local = getLocal<TestimonialItem[]>('ravan_testimonials', initialTestimonials);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('testimonials').select('*').order('display_order').limit(100);
@@ -3676,7 +3739,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getTestimonials fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialTestimonials;
+      const verified = memoryCache.getEntry<TestimonialItem[]>('testimonials');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 
@@ -3725,7 +3792,6 @@ export const dataService = {
   // --- PARTNERS & CLIENTS ---
   async getPartners(forceRefresh: boolean = false): Promise<PartnerItem[]> {
     return memoryCache.swrFetch('partners', async () => {
-      const local = getLocal<PartnerItem[]>('ravan_partners', initialPartners);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('partners').select('*').order('display_order');
@@ -3737,7 +3803,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getPartners fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialPartners;
+      const verified = memoryCache.getEntry<PartnerItem[]>('partners');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return initialPartners;
     }, { forceRefresh });
   },
 
@@ -3794,7 +3864,6 @@ export const dataService = {
 
   async getClients(forceRefresh: boolean = false): Promise<ClientItem[]> {
     return memoryCache.swrFetch('clients', async () => {
-      const local = getLocal<ClientItem[]>('ravan_clients', initialClients);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('clients').select('*').order('display_order');
@@ -3806,7 +3875,11 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getClients fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialClients;
+      const verified = memoryCache.getEntry<ClientItem[]>('clients');
+      if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
+        return verified.data;
+      }
+      return [];
     }, { forceRefresh });
   },
 

@@ -5,7 +5,6 @@ import { SmartImage } from '../components/common/SmartImage';
 import { WorkWithUsModal } from '../components/common/WorkWithUsModal';
 import { dataService } from '../lib/dataService';
 import { ServiceItem } from '../types';
-import { initialServices } from '../data/initialData';
 import { 
   ArrowRight, 
   CheckCircle2, 
@@ -44,22 +43,31 @@ const renderFeatureIcon = (iconName?: string) => {
 };
 
 export const ServicesPage: React.FC = () => {
-  const [services, setServices] = useState<ServiceItem[]>(() => dataService.getServicesSync());
-  const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState<ServiceItem[] | null>(() => dataService.getCachedServices());
+  const [loading, setLoading] = useState<boolean>(() => dataService.getCachedServices() === null);
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getServices().then((data) => {
-      if (isMounted && data) {
-        setServices(data);
+      if (isMounted) {
+        setServices(data || []);
+        setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) {
+        setServices([]);
+        setLoading(false);
+      }
+    });
 
     const handleUpdate = () => {
       dataService.getServices(true).then((data) => {
-        if (isMounted) setServices(data);
+        if (isMounted) {
+          setServices(data || []);
+          setLoading(false);
+        }
       });
     };
     window.addEventListener('ravan_data_updated', handleUpdate);
@@ -70,6 +78,10 @@ export const ServicesPage: React.FC = () => {
       window.removeEventListener('ravan_services_updated', handleUpdate);
     };
   }, []);
+
+  const activeServices = (services || [])
+    .filter(srv => srv.status !== 'draft' && srv.status !== 'archived')
+    .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
 
   return (
     <Layout>
@@ -111,7 +123,7 @@ export const ServicesPage: React.FC = () => {
 
       {/* Services List */}
       <section className="w-full max-w-container-max mx-auto px-gutter py-12 pb-28">
-        {loading || !services ? (
+        {loading ? (
           <div className="flex flex-col gap-12" aria-busy="true">
             {[1, 2, 3].map((i) => (
               <div key={i} className="p-8 md:p-12 rounded-2xl bg-surface border border-outline-variant/70 animate-pulse grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -125,12 +137,26 @@ export const ServicesPage: React.FC = () => {
               </div>
             ))}
           </div>
+        ) : activeServices.length === 0 ? (
+          <div className="text-center py-20 px-6 rounded-2xl bg-surface border border-outline-variant/70 max-w-3xl mx-auto">
+            <Layers className="w-12 h-12 text-secondary/60 mx-auto mb-4" />
+            <h3 className="text-xl font-bold font-display text-primary mb-2">
+              Enterprise Architectural Services Under Scheduled Deployment
+            </h3>
+            <p className="text-sm text-on-surface-variant max-w-lg mx-auto mb-8 leading-relaxed">
+              Full-lifecycle enterprise software engineering, sovereign AI/ML pipeline deployments, and ultra-low latency architecture offerings are actively being provisioned. Reach out to our systems architecture team for bespoke enterprise deployments.
+            </p>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center gap-2 px-6 py-3.5 bg-primary text-white text-xs font-semibold tracking-widest uppercase rounded hover:bg-primary-container transition-all shadow-md"
+            >
+              <span>INITIATE ARCHITECTURAL CONSULTATION</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         ) : (
           <div className="flex flex-col gap-24">
-            {services
-              .filter(srv => srv.status !== 'draft' && srv.status !== 'archived')
-              .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-              .map((srv, idx) => (
+            {activeServices.map((srv, idx) => (
             <div
               key={srv.id}
               className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-center p-8 md:p-12 rounded-2xl bg-surface border border-outline-variant/70 shadow-sm hover:shadow-md transition-shadow"

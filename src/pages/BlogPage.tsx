@@ -4,24 +4,32 @@ import { SEOHead } from '../components/common/SEOHead';
 import { SmartImage } from '../components/common/SmartImage';
 import { dataService } from '../lib/dataService';
 import { BlogPost } from '../types';
-import { initialBlogPosts } from '../data/initialData';
 import { ArrowRight, Clock, Newspaper } from 'lucide-react';
 
 export const BlogPage: React.FC = () => {
-  const [posts, setPosts] = useState<BlogPost[]>(() => dataService.getBlogPostsSync());
-  const [loading, setLoading] = useState(false);
+  const [posts, setPosts] = useState<BlogPost[] | null>(() => dataService.getCachedBlogPosts());
+  const [loading, setLoading] = useState<boolean>(() => dataService.getCachedBlogPosts() === null);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getBlogPosts().then((data) => {
-      if (isMounted && data) {
-        setPosts(data);
+      if (isMounted) {
+        setPosts(data || []);
+        setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) {
+        setPosts([]);
+        setLoading(false);
+      }
+    });
 
     const handleUpdate = () => {
-      dataService.getBlogPosts().then((data) => {
-        if (isMounted) setPosts(data);
+      dataService.getBlogPosts(true).then((data) => {
+        if (isMounted) {
+          setPosts(data || []);
+          setLoading(false);
+        }
       });
     };
     window.addEventListener('ravan_data_updated', handleUpdate);
@@ -53,7 +61,7 @@ export const BlogPage: React.FC = () => {
       </section>
 
       <section className="w-full max-w-container-max mx-auto px-gutter pb-28 space-y-12">
-        {loading || !posts ? (
+        {loading ? (
           <div className="space-y-8" aria-busy="true">
             {[1, 2].map(i => (
               <div key={i} className="p-8 md:p-12 rounded-2xl bg-surface border border-outline-variant animate-pulse grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -66,11 +74,13 @@ export const BlogPage: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : posts.length === 0 ? (
-          <div className="p-16 rounded-2xl bg-surface border border-outline-variant text-center max-w-xl mx-auto my-12">
-            <Newspaper className="w-12 h-12 text-secondary mx-auto mb-4" />
-            <h3 className="text-xl font-bold font-display text-primary mb-2">No Whitepapers Published</h3>
-            <p className="text-xs text-on-surface-variant">There are currently no engineering whitepapers published.</p>
+        ) : (!posts || posts.length === 0) ? (
+          <div className="p-16 rounded-2xl bg-surface border border-outline-variant/70 text-center max-w-xl mx-auto my-12">
+            <Newspaper className="w-12 h-12 text-secondary/60 mx-auto mb-4" />
+            <h3 className="text-xl font-bold font-display text-primary mb-2">Technical Dispatches Under Peer Review</h3>
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              Our engineering research papers, kernel architecture analyses, and AI benchmark publications are currently undergoing institutional peer review prior to public release.
+            </p>
           </div>
         ) : (
           posts.map(p => (

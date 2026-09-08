@@ -36,6 +36,8 @@ export const EcosystemTeaser: React.FC<EcosystemTeaserProps> = ({ ecosystem, isL
     );
   }
 
+  if (!ecosystem || ecosystem.length === 0) return null;
+
   const techPark = ecosystem.find(e => e.type === 'hub' || e.name.toLowerCase().includes('tech park')) || ecosystem[0];
   const filmStudio = ecosystem.find(e => e.type === 'studio' || e.name.toLowerCase().includes('film studio')) || ecosystem[1];
 

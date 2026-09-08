@@ -4,25 +4,33 @@ import { SEOHead } from '../components/common/SEOHead';
 import { SmartImage } from '../components/common/SmartImage';
 import { dataService } from '../lib/dataService';
 import { SolutionItem } from '../types';
-import { initialSolutions } from '../data/initialData';
 import { CheckCircle2, ArrowRight, Layers, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const SolutionsPage: React.FC = () => {
-  const [solutions, setSolutions] = useState<SolutionItem[]>(() => dataService.getSolutionsSync());
-  const [loading, setLoading] = useState(false);
+  const [solutions, setSolutions] = useState<SolutionItem[] | null>(() => dataService.getCachedSolutions());
+  const [loading, setLoading] = useState<boolean>(() => dataService.getCachedSolutions() === null);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getSolutions().then((data) => {
-      if (isMounted && data) {
-        setSolutions(data);
+      if (isMounted) {
+        setSolutions(data || []);
+        setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) {
+        setSolutions([]);
+        setLoading(false);
+      }
+    });
 
     const handleUpdate = () => {
       dataService.getSolutions(true).then((data) => {
-        if (isMounted) setSolutions(data);
+        if (isMounted) {
+          setSolutions(data || []);
+          setLoading(false);
+        }
       });
     };
     window.addEventListener('ravan_data_updated', handleUpdate);
@@ -33,6 +41,10 @@ export const SolutionsPage: React.FC = () => {
       window.removeEventListener('ravan_solutions_updated', handleUpdate);
     };
   }, []);
+
+  const activeSolutions = (solutions || [])
+    .filter(sol => sol.status !== 'draft' && sol.status !== 'archived')
+    .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
 
   return (
     <Layout>
@@ -59,7 +71,7 @@ export const SolutionsPage: React.FC = () => {
       </section>
 
       <section className="w-full max-w-container-max mx-auto px-gutter pb-28 space-y-16">
-        {loading || !solutions ? (
+        {loading ? (
           <div className="space-y-12" aria-busy="true">
             {[1, 2].map(i => (
               <div key={i} className="p-8 md:p-12 rounded-2xl bg-surface border border-outline-variant animate-pulse grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -73,11 +85,25 @@ export const SolutionsPage: React.FC = () => {
               </div>
             ))}
           </div>
+        ) : activeSolutions.length === 0 ? (
+          <div className="text-center py-20 px-6 rounded-2xl bg-surface border border-outline-variant/70 max-w-3xl mx-auto">
+            <Layers className="w-12 h-12 text-secondary/60 mx-auto mb-4" />
+            <h3 className="text-xl font-bold font-display text-primary mb-2">
+              Enterprise Architecture Blueprints
+            </h3>
+            <p className="text-sm text-on-surface-variant max-w-lg mx-auto mb-8 leading-relaxed">
+              Sovereign engineering blueprints and low-latency system architectures are actively undergoing institutional clearance. Contact our technical team for custom blueprint inquiries.
+            </p>
+            <Link
+              to="/contact"
+              className="inline-flex items-center gap-2 px-6 py-3.5 bg-primary text-white text-xs font-semibold tracking-widest uppercase rounded hover:bg-primary-container transition-all shadow-md"
+            >
+              <span>REQUEST ARCHITECTURAL BRIEF</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         ) : (
-          solutions
-            .filter(sol => sol.status !== 'draft' && sol.status !== 'archived')
-            .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-            .map((sol, idx) => (
+          activeSolutions.map((sol, idx) => (
           <div
             key={sol.id}
             className="p-8 md:p-12 rounded-2xl bg-surface border border-outline-variant shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-8 items-center"

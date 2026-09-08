@@ -41,6 +41,8 @@ export const SelectedProjectsPreview: React.FC<SelectedProjectsPreviewProps> = (
     );
   }
 
+  if (!projects || projects.length === 0) return null;
+
   const displayProjects = projects.slice(0, 2);
 
   return (

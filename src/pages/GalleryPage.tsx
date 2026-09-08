@@ -4,24 +4,32 @@ import { SEOHead } from '../components/common/SEOHead';
 import { SmartImage } from '../components/common/SmartImage';
 import { dataService } from '../lib/dataService';
 import { GalleryAlbum } from '../types';
-import { initialGalleryAlbums } from '../data/initialData';
 import { Images } from 'lucide-react';
 
 export const GalleryPage: React.FC = () => {
-  const [albums, setAlbums] = useState<GalleryAlbum[]>(() => dataService.getGalleryAlbumsSync());
-  const [loading, setLoading] = useState(false);
+  const [albums, setAlbums] = useState<GalleryAlbum[] | null>(() => dataService.getCachedGalleryAlbums());
+  const [loading, setLoading] = useState<boolean>(() => dataService.getCachedGalleryAlbums() === null);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getGalleryAlbums().then((data) => {
-      if (isMounted && data) {
-        setAlbums(data);
+      if (isMounted) {
+        setAlbums(data || []);
+        setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) {
+        setAlbums([]);
+        setLoading(false);
+      }
+    });
 
     const handleUpdate = () => {
-      dataService.getGalleryAlbums().then((data) => {
-        if (isMounted) setAlbums(data);
+      dataService.getGalleryAlbums(true).then((data) => {
+        if (isMounted) {
+          setAlbums(data || []);
+          setLoading(false);
+        }
       });
     };
     window.addEventListener('ravan_data_updated', handleUpdate);
@@ -56,7 +64,7 @@ export const GalleryPage: React.FC = () => {
       </section>
 
       <section className="w-full max-w-container-max mx-auto px-gutter pb-28">
-        {loading || !albums ? (
+        {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8" aria-busy="true">
             {[1, 2, 3].map(i => (
               <div key={i} className="bg-surface rounded-2xl overflow-hidden border border-outline-variant animate-pulse">
@@ -68,11 +76,13 @@ export const GalleryPage: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : albums.length === 0 ? (
-          <div className="p-16 rounded-2xl bg-surface border border-outline-variant text-center max-w-xl mx-auto my-12">
-            <Images className="w-12 h-12 text-secondary mx-auto mb-4" />
-            <h3 className="text-xl font-bold font-display text-primary mb-2">No Albums Published</h3>
-            <p className="text-xs text-on-surface-variant">There are currently no visual albums published in the gallery archive.</p>
+        ) : (!albums || albums.length === 0) ? (
+          <div className="p-16 rounded-2xl bg-surface border border-outline-variant/70 text-center max-w-xl mx-auto my-12">
+            <Images className="w-12 h-12 text-secondary/60 mx-auto mb-4" />
+            <h3 className="text-xl font-bold font-display text-primary mb-2">Visual Archives Under Curatorial Staging</h3>
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              High-resolution campus photography, hardware laboratory captures, and virtual production stage footage are currently undergoing curatorial preparation for public exhibition.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

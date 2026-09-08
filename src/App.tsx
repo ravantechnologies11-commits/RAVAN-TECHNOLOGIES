@@ -38,12 +38,16 @@ export function isAdminDeployment(): boolean {
 
   const hostname = window.location.hostname.toLowerCase();
 
-  // 2. Authoritative production CMS subdomains
+  // 2. Authoritative production CMS subdomains (strict exact/suffix match only)
   if (hostname === 'cms.ravantechnologies.in') return true;
-  if (hostname.startsWith('cms.') || hostname.startsWith('admin.')) return true;
+  if (hostname === 'admin.ravantechnologies.in') return true;
+  if (hostname === 'cms.ravantechnologies.com') return true;
 
-  // 3. Vercel deployment domain for admin project (e.g. ravan-technologies-admin.vercel.app)
-  if (hostname.includes('admin')) return true;
+  // 3. Vercel deployment domains for the admin project (strict suffix match — NOT .includes())
+  // This prevents spoofing via hostnames like 'evil-admin-hack.com' that contain 'admin' as a substring
+  if (hostname === 'ravan-technologies-admin.vercel.app') return true;
+  if (hostname.endsWith('-admin.vercel.app') && hostname.startsWith('ravan')) return true;
+  if (hostname.endsWith('-cms.vercel.app') && hostname.startsWith('ravan')) return true;
 
   // 4. Localhost development: allow testing admin when accessing /admin directly
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost');

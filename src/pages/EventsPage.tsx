@@ -4,25 +4,33 @@ import { SEOHead } from '../components/common/SEOHead';
 import { SmartImage } from '../components/common/SmartImage';
 import { dataService } from '../lib/dataService';
 import { EventItem } from '../types';
-import { initialEvents } from '../data/initialData';
 import { Calendar, MapPin, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const EventsPage: React.FC = () => {
-  const [events, setEvents] = useState<EventItem[]>(() => dataService.getEventsSync());
-  const [loading, setLoading] = useState(false);
+  const [events, setEvents] = useState<EventItem[] | null>(() => dataService.getCachedEvents());
+  const [loading, setLoading] = useState<boolean>(() => dataService.getCachedEvents() === null);
 
   useEffect(() => {
     let isMounted = true;
     dataService.getEvents().then((data) => {
-      if (isMounted && data) {
-        setEvents(data);
+      if (isMounted) {
+        setEvents(data || []);
+        setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) {
+        setEvents([]);
+        setLoading(false);
+      }
+    });
 
     const handleUpdate = () => {
-      dataService.getEvents().then((data) => {
-        if (isMounted) setEvents(data);
+      dataService.getEvents(true).then((data) => {
+        if (isMounted) {
+          setEvents(data || []);
+          setLoading(false);
+        }
       });
     };
     window.addEventListener('ravan_data_updated', handleUpdate);
@@ -54,7 +62,7 @@ export const EventsPage: React.FC = () => {
       </section>
 
       <section className="w-full max-w-container-max mx-auto px-gutter pb-28 space-y-10">
-        {loading || !events ? (
+        {loading ? (
           <div className="space-y-8" aria-busy="true">
             {[1, 2].map(i => (
               <div key={i} className="p-8 md:p-12 rounded-2xl bg-surface border border-outline-variant animate-pulse grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -67,11 +75,20 @@ export const EventsPage: React.FC = () => {
               </div>
             ))}
           </div>
-        ) : events.length === 0 ? (
-          <div className="p-16 rounded-2xl bg-surface border border-outline-variant text-center max-w-xl mx-auto my-12">
-            <Calendar className="w-12 h-12 text-secondary mx-auto mb-4" />
-            <h3 className="text-xl font-bold font-display text-primary mb-2">No Upcoming Events</h3>
-            <p className="text-xs text-on-surface-variant">There are currently no scheduled public summits or pitch days.</p>
+        ) : (!events || events.length === 0) ? (
+          <div className="p-16 rounded-2xl bg-surface border border-outline-variant/70 text-center max-w-xl mx-auto my-12">
+            <Calendar className="w-12 h-12 text-secondary/60 mx-auto mb-4" />
+            <h3 className="text-xl font-bold font-display text-primary mb-2">Technical Summits & Symposia Under Scheduling</h3>
+            <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+              Global developer summits, architecture symposia, and sovereign AI pitch days are currently being scheduled. Inquire directly for advance invitations or summit partnerships.
+            </p>
+            <Link
+              to="/contact"
+              className="inline-flex items-center gap-2 px-6 py-3.5 bg-primary text-white text-xs font-semibold tracking-widest uppercase rounded hover:bg-primary-container transition-all shadow-md"
+            >
+              <span>INQUIRE ABOUT UPCOMING SYMPOSIA</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         ) : (
           events.map(evt => (

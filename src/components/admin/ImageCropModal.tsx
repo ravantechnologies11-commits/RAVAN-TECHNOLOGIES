@@ -15,9 +15,13 @@ export interface ImageCropModalProps {
   onClose: () => void;
   onConfirm: (result: CropResult) => void;
   aspectRatioLabel?: '4:5 (Portrait)' | '4:3 (Standard)' | '16:9 (Landscape)' | '1:1 (Square)' | '16:10 (Wide)' | '4:6 (Standard Photo)';
-  targetBucket?: 'media' | 'avatars' | 'gallery' | 'projects' | 'ecosystem';
+  targetBucket?: 'media' | 'avatars' | 'gallery' | 'projects' | 'ecosystem' | 'site-assets';
   targetFolder?: string;
   initialAltText?: string;
+  title?: string;
+  recommendedWidth?: number;
+  recommendedHeight?: number;
+  recommendedNote?: string;
 }
 
 export const ImageCropModal: React.FC<ImageCropModalProps> = ({
@@ -27,7 +31,11 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   aspectRatioLabel = '4:5 (Portrait)',
   targetBucket = 'avatars',
   targetFolder = 'general',
-  initialAltText = ''
+  initialAltText = '',
+  title = 'Adjust Image Crop',
+  recommendedWidth = 1200,
+  recommendedHeight,
+  recommendedNote
 }) => {
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -110,6 +118,15 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     setZoom(newZoom);
     setPan(newPan);
   }, [sourceInfo, ratioNumeric, faceDetected, faceBox]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTargetRatio(aspectRatioLabel);
+      if (imageSrc) {
+        calculateFit(fitMode, getNumericRatio(aspectRatioLabel));
+      }
+    }
+  }, [isOpen, aspectRatioLabel]);
 
   useEffect(() => {
     if (imageSrc) {
@@ -197,8 +214,8 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
     try {
       const canvas = document.createElement('canvas');
-      const exportWidth = 1200;
-      const exportHeight = exportWidth / ratioNumeric;
+      const exportWidth = recommendedWidth || 1200;
+      const exportHeight = recommendedHeight || Math.round(exportWidth / ratioNumeric);
       
       canvas.width = exportWidth;
       canvas.height = exportHeight;
@@ -250,7 +267,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-[#07111e]">
           <div className="flex items-center gap-3">
             <Focus className="w-5 h-5 text-secondary" />
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Adjust Leadership Image</h2>
+            <h2 className="text-sm font-bold text-white uppercase tracking-wider">{title}</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
@@ -303,6 +320,11 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                       <div className="border-r border-b border-white"></div><div className="border-r border-b border-white"></div><div className="border-b border-white"></div>
                       <div className="border-r border-white"></div><div className="border-r border-white"></div><div></div>
                     </div>
+
+                    {/* Safe Area Guide (90% Title/Subject Safe Zone) */}
+                    <div className="absolute inset-[5%] border border-dashed border-emerald-400/40 pointer-events-none rounded flex items-start p-1">
+                      <span className="text-[8px] font-mono text-emerald-400/80 bg-black/60 px-1 py-0.5 rounded tracking-wider">SAFE AREA</span>
+                    </div>
                   </div>
                 </div>
 
@@ -322,15 +344,29 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
               <div className="lg:col-span-5 space-y-5">
                 
                 <div className="bg-[#07111e] p-5 rounded-xl border border-slate-800 space-y-4">
-                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 border-b border-slate-800 pb-2">Fixed Image Frame / Live Preview</h3>
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 border-b border-slate-800 pb-2">Authoritative Target Dimensions</h3>
+
+                  <div className="bg-[#040a14] p-3.5 rounded-lg border border-secondary/30 space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-semibold">Recommended Frontend Size:</span>
+                      <span className="text-secondary font-mono font-bold">{recommendedWidth} × {recommendedHeight || Math.round(recommendedWidth / ratioNumeric)} px</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-semibold">Authoritative Aspect Ratio:</span>
+                      <span className="text-white font-mono font-semibold">{targetRatio}</span>
+                    </div>
+                    {recommendedNote && (
+                      <p className="text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/80 leading-normal">{recommendedNote}</p>
+                    )}
+                  </div>
                   
                   <div className="space-y-3 text-xs">
                     <div className="flex justify-between items-center border-b border-slate-800/50 pb-2">
-                      <span className="text-slate-500">Source:</span>
+                      <span className="text-slate-500">Source Image:</span>
                       <span className="text-white font-mono">{sourceInfo ? `${sourceInfo.w} × ${sourceInfo.h} px` : '---'}</span>
                     </div>
                     <div className="flex justify-between items-center border-b border-slate-800/50 pb-2">
-                      <span className="text-slate-500">Ratio:</span>
+                      <span className="text-slate-500">Source Ratio:</span>
                       <span className="text-white font-mono">{sourceInfo ? `${(sourceInfo.w / sourceInfo.h).toFixed(2)} (${sourceInfo.orientation})` : '---'}</span>
                     </div>
                     
@@ -341,8 +377,8 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                         onChange={(e) => setTargetRatio(e.target.value)}
                         className="bg-[#0a192f] border border-slate-700 text-secondary font-mono rounded px-2 py-1 text-xs focus:outline-none focus:border-secondary"
                       >
-                        <option value="4:5 (Portrait)">4:5 (Portrait)</option>
                         <option value="4:3 (Standard)">4:3 (Standard)</option>
+                        <option value="4:5 (Portrait)">4:5 (Portrait)</option>
                         <option value="4:6 (Standard Photo)">4:6 (Standard Photo)</option>
                         <option value="1:1 (Square)">1:1 (Square)</option>
                         <option value="16:9 (Landscape)">16:9 (Landscape)</option>
@@ -351,16 +387,16 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                     </div>
 
                     <div className="flex justify-between items-center border-b border-slate-800/50 pb-2">
-                      <span className="text-slate-500">Face detected:</span>
+                      <span className="text-slate-500">Face Detected:</span>
                       <span className={`font-mono ${faceDetected ? 'text-secondary font-bold' : 'text-slate-400'}`}>{faceDetected ? 'Yes' : 'No'}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">Output:</span>
-                      <span className="text-secondary font-mono font-bold">1200 × {Math.round(1200 / ratioNumeric)} px</span>
+                      <span className="text-slate-500">Processed Canvas Export:</span>
+                      <span className="text-secondary font-mono font-bold">{recommendedWidth} × {recommendedHeight || Math.round(recommendedWidth / ratioNumeric)} px</span>
                     </div>
-                    {sourceInfo && sourceInfo.w < 1200 && (
+                    {sourceInfo && sourceInfo.w < (recommendedWidth || 1200) && (
                       <div className="mt-2 text-[10px] text-amber-400 bg-amber-400/10 p-2 rounded flex items-start gap-1.5 border border-amber-400/20">
-                        <span className="font-bold">⚠ Warning:</span> Source resolution is lower than 1200px output. Image quality may be reduced.
+                        <span className="font-bold">⚠ Warning:</span> Source resolution ({sourceInfo.w}px) is lower than target {recommendedWidth || 1200}px output. Image quality may be slightly reduced.
                       </div>
                     )}
                   </div>

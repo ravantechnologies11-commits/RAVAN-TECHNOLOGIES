@@ -16,13 +16,18 @@ import { ServiceItem, HackathonItem, ProjectItem, EcosystemItem, SiteSettings } 
 
 export const HomePage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [services, setServices] = useState<ServiceItem[]>(() => dataService.getServicesSync());
-  const [hackathon, setHackathon] = useState<HackathonItem | null>(() => dataService.getHackathonSync());
-  const [projects, setProjects] = useState<ProjectItem[]>(() => dataService.getProjectsSync());
-  const [ecosystem, setEcosystem] = useState<EcosystemItem[]>(() => dataService.getEcosystemSync());
+  const [services, setServices] = useState<ServiceItem[] | null>(() => dataService.getCachedServices());
+  const [hackathon, setHackathon] = useState<HackathonItem | null>(() => dataService.getCachedHackathon());
+  const [projects, setProjects] = useState<ProjectItem[] | null>(() => dataService.getCachedProjects());
+  const [ecosystem, setEcosystem] = useState<EcosystemItem[] | null>(() => dataService.getCachedEcosystem());
   const [site, setSite] = useState<SiteSettings>(() => dataService.getSiteSettingsSync());
   const [siteLoading, setSiteLoading] = useState(false);
-  const [contentLoading, setContentLoading] = useState(false);
+  const [contentLoading, setContentLoading] = useState<boolean>(() => 
+    dataService.getCachedServices() === null ||
+    dataService.getCachedHackathon() === null ||
+    dataService.getCachedProjects() === null ||
+    dataService.getCachedEcosystem() === null
+  );
 
   const { founder, loading: founderLoading } = useFounder();
 
@@ -45,10 +50,10 @@ export const HomePage: React.FC = () => {
         dataService.getProjects(forceRefresh),
         dataService.getEcosystem(forceRefresh)
       ]);
-      setServices(s);
-      setHackathon(h);
-      setProjects(p);
-      setEcosystem(e);
+      setServices(s || []);
+      setHackathon(h || null);
+      setProjects(p || []);
+      setEcosystem(e || []);
     } catch {
       // Clean fallback
     } finally {

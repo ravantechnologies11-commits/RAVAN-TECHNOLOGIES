@@ -25,13 +25,39 @@ export const AdminFilmStudio: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'general' | 'facilities' | 'features' | 'gallery'>('general');
   const [isCropOpen, setIsCropOpen] = useState(false);
 
+  const defaultFilmStudio: EcosystemItem = {
+    id: 'eco-filmstudio',
+    name: 'Ravan Film Studio',
+    tagline: 'Next-Generation Virtual Production & LED Volume',
+    description: 'A cutting-edge virtual production stage integrating in-camera visual effects (ICVFX), real-time Unreal Engine rendering, and motion capture.',
+    type: 'studio',
+    image_url: 'https://images.unsplash.com/photo-1598899134739-24c46f58b8c0?auto=format&fit=crop&q=80',
+    metrics: {
+      value: '270° CURVED',
+      label: 'LED VOLUME STAGE',
+      sublabel: 'Real-Time ICVFX Rendering'
+    },
+    features: [
+      { title: 'In-Camera Visual Effects', description: 'Real-time camera tracking and background projection', icon: 'camera' },
+      { title: 'Unreal Engine 5 Pipeline', description: 'Photorealistic real-time environment generation', icon: 'film' }
+    ],
+    specifications: [
+      'Full 270-degree curved LED volume stage',
+      'Real-time Unreal Engine 5.4 rendering clusters',
+      'Sub-millimeter optical camera tracking systems',
+      'SMPTE 2110 IP broadcast video infrastructure'
+    ],
+    status_badge: 'OPERATIONAL',
+    display_order: 2
+  };
+
   useEffect(() => {
     dataService.getEcosystem().then(items => {
-      const st = items.find(i => i.type === 'studio') || items[1] || initialEcosystem[1];
+      const st = items.find(i => i.type === 'studio') || items[1] || defaultFilmStudio;
       setStudio(JSON.parse(JSON.stringify(st)));
       setLoading(false);
     }).catch(() => {
-      setStudio(JSON.parse(JSON.stringify(initialEcosystem[1])));
+      setStudio(JSON.parse(JSON.stringify(defaultFilmStudio)));
       setLoading(false);
     });
   }, []);
@@ -43,7 +69,10 @@ export const AdminFilmStudio: React.FC = () => {
     setIsSaving(true);
     try {
       const all = await dataService.getEcosystem();
-      const updated = all.map(item => (item.id === studio.id ? studio : item));
+      const exists = all.some(item => item.id === studio.id);
+      const updated = exists 
+        ? all.map(item => (item.id === studio.id ? studio : item))
+        : [...all, studio];
       await dataService.saveEcosystem(updated);
       showToast('Ravan Film Studio specifications saved.', 'success');
     } catch (err: any) {

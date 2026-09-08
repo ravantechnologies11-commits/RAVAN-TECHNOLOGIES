@@ -121,7 +121,7 @@ export const AdminLogin: React.FC = () => {
 
         <div className="mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
           <a 
-            href="https://ravan-technologies-i99k.vercel.app" 
+            href="https://ravantechnologies.in" 
             target="_blank" 
             rel="noopener noreferrer" 
             className="hover:text-white transition-colors"
