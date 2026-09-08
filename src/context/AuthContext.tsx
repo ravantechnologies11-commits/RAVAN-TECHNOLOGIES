@@ -15,25 +15,26 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Authorized admin roles for Ravan CMS Control Panel
 const AUTHORIZED_ADMIN_ROLES = ['super_admin', 'admin'];
 
-// Explicit authorized administrative domains/emails
-const AUTHORIZED_ADMIN_EMAILS = [
-  'admin@ravantechnologies.in',
+// Exactly two authorized executive administrator accounts
+export const AUTHORIZED_ADMIN_EMAILS: readonly string[] = [
   'founder@ravantechnologies.in',
-  'ceo@ravantechnologies.in',
-  'contact@ravantechnologies.in',
-  'ravantechnologies11@gmail.com'
+  'ceo@ravantechnologies.in'
 ];
 
-function isAuthorizedAdminEmail(email: string): boolean {
+export function isAuthorizedAdminEmail(email: string): boolean {
   if (!email) return false;
   const clean = email.trim().toLowerCase();
-  if (AUTHORIZED_ADMIN_EMAILS.includes(clean)) return true;
-  if (clean.endsWith('@ravantechnologies.in')) return true;
-  return false;
+  return AUTHORIZED_ADMIN_EMAILS.includes(clean);
 }
 
 async function resolveAuthorizedUser(userId: string, defaultEmail: string, metadata: any): Promise<User | null> {
   const cleanEmail = (defaultEmail || '').trim().toLowerCase();
+
+  // Strict Gate: Email must be one of the two authorized administrator accounts
+  if (!isAuthorizedAdminEmail(cleanEmail)) {
+    if (import.meta.env.DEV) console.warn(`Unauthorized login attempt rejected for non-admin email: ${cleanEmail}`);
+    return null;
+  }
 
   if (isSupabaseConfigured && supabase) {
     try {
