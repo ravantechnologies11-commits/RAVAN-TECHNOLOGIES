@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
-import { HackathonItem, ProblemStatement } from '../../types';
+import { HackathonItem, ProblemStatement, WinningSolution } from '../../types';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import {
@@ -16,7 +16,12 @@ import {
   Upload,
   X,
   Code2,
-  Focus
+  Focus,
+  ChevronUp,
+  ChevronDown,
+  Award,
+  ShieldCheck,
+  Layers
 } from 'lucide-react';
 
 export const AdminHackathons: React.FC = () => {
@@ -29,7 +34,7 @@ export const AdminHackathons: React.FC = () => {
   // Modal / Editing State
   const [editingItem, setEditingItem] = useState<HackathonItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'problems' | 'rules'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'problems' | 'rules' | 'winners'>('details');
 
   // Image Crop Modal
   const [isCropOpen, setIsCropOpen] = useState(false);
@@ -122,10 +127,19 @@ export const AdminHackathons: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const exists = hackathons.some(h => h.id === editingItem.id);
+      // Clean up empty strings in prizes and rules before saving
+      const cleanedItem: HackathonItem = {
+        ...editingItem,
+        prizes: (editingItem.prizes || []).map(p => p.trim()).filter(Boolean),
+        rules: (editingItem.rules || []).map(r => r.trim()).filter(Boolean),
+        winning_solutions: (editingItem.winning_solutions || []).filter(w => (w.project_name || '').trim() || (w.rank || '').trim()),
+        problem_statements: editingItem.problem_statements || []
+      };
+
+      const exists = hackathons.some(h => h.id === cleanedItem.id);
       const updated = exists
-        ? hackathons.map(h => (h.id === editingItem.id ? editingItem : h))
-        : [editingItem, ...hackathons];
+        ? hackathons.map(h => (h.id === cleanedItem.id ? cleanedItem : h))
+        : [cleanedItem, ...hackathons];
 
       setHackathons(updated);
       await dataService.saveHackathons(updated);
@@ -189,6 +203,108 @@ export const AdminHackathons: React.FC = () => {
       ...editingItem,
       problem_statements: editingItem.problem_statements.filter((_, idx) => idx !== index)
     });
+  };
+
+  // Rules handlers
+  const handleAddRule = () => {
+    if (!editingItem) return;
+    setEditingItem({
+      ...editingItem,
+      rules: [...(editingItem.rules || []), '']
+    });
+  };
+
+  const handleUpdateRule = (index: number, val: string) => {
+    if (!editingItem) return;
+    const copy = [...(editingItem.rules || [])];
+    copy[index] = val;
+    setEditingItem({ ...editingItem, rules: copy });
+  };
+
+  const handleRemoveRule = (index: number) => {
+    if (!editingItem) return;
+    const copy = (editingItem.rules || []).filter((_, idx) => idx !== index);
+    setEditingItem({ ...editingItem, rules: copy });
+  };
+
+  const handleMoveRule = (index: number, direction: 'up' | 'down') => {
+    if (!editingItem || !editingItem.rules) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= editingItem.rules.length) return;
+    const copy = [...editingItem.rules];
+    const [moved] = copy.splice(index, 1);
+    copy.splice(targetIndex, 0, moved);
+    setEditingItem({ ...editingItem, rules: copy });
+  };
+
+  // Prizes handlers
+  const handleAddPrize = () => {
+    if (!editingItem) return;
+    setEditingItem({
+      ...editingItem,
+      prizes: [...(editingItem.prizes || []), '']
+    });
+  };
+
+  const handleUpdatePrize = (index: number, val: string) => {
+    if (!editingItem) return;
+    const copy = [...(editingItem.prizes || [])];
+    copy[index] = val;
+    setEditingItem({ ...editingItem, prizes: copy });
+  };
+
+  const handleRemovePrize = (index: number) => {
+    if (!editingItem) return;
+    const copy = (editingItem.prizes || []).filter((_, idx) => idx !== index);
+    setEditingItem({ ...editingItem, prizes: copy });
+  };
+
+  const handleMovePrize = (index: number, direction: 'up' | 'down') => {
+    if (!editingItem || !editingItem.prizes) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= editingItem.prizes.length) return;
+    const copy = [...editingItem.prizes];
+    const [moved] = copy.splice(index, 1);
+    copy.splice(targetIndex, 0, moved);
+    setEditingItem({ ...editingItem, prizes: copy });
+  };
+
+  // Winners handlers
+  const handleAddWinner = () => {
+    if (!editingItem) return;
+    const newWinner: WinningSolution = {
+      rank: '',
+      project_name: '',
+      team_name: '',
+      description: ''
+    };
+    setEditingItem({
+      ...editingItem,
+      winning_solutions: [...(editingItem.winning_solutions || []), newWinner]
+    });
+  };
+
+  const handleUpdateWinner = (index: number, field: keyof WinningSolution, val: string) => {
+    if (!editingItem) return;
+    const copy = [...(editingItem.winning_solutions || [])];
+    copy[index] = { ...copy[index], [field]: val };
+    setEditingItem({ ...editingItem, winning_solutions: copy });
+  };
+
+  const handleRemoveWinner = (index: number) => {
+    if (!editingItem) return;
+    const copy = (editingItem.winning_solutions || []).filter((_, idx) => idx !== index);
+    setEditingItem({ ...editingItem, winning_solutions: copy });
+  };
+
+  const handleMoveWinner = (index: number, direction: 'up' | 'down') => {
+    if (!editingItem || !editingItem.winning_solutions) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= editingItem.winning_solutions.length) return;
+    const copy = [...editingItem.winning_solutions];
+    const [moved] = copy.splice(index, 1);
+    copy.splice(targetIndex, 0, moved);
+    setEditingItem({ ...editingItem, winning_solutions: copy });
   };
 
   const filteredHackathons = hackathons.filter(h => {
@@ -378,10 +494,10 @@ export const AdminHackathons: React.FC = () => {
             </div>
 
             {/* Modal Tabs */}
-            <div className="flex items-center gap-4 px-6 pt-3 border-b border-slate-800 bg-[#07111e]/50 text-xs font-bold uppercase">
+            <div className="flex items-center gap-4 px-6 pt-3 border-b border-slate-800 bg-[#07111e]/50 text-xs font-bold uppercase overflow-x-auto">
               <button
                 onClick={() => setActiveTab('details')}
-                className={`pb-3 border-b-2 transition-colors ${
+                className={`pb-3 border-b-2 transition-colors shrink-0 ${
                   activeTab === 'details'
                     ? 'border-secondary text-secondary'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -391,7 +507,7 @@ export const AdminHackathons: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('problems')}
-                className={`pb-3 border-b-2 transition-colors flex items-center gap-1.5 ${
+                className={`pb-3 border-b-2 transition-colors flex items-center gap-1.5 shrink-0 ${
                   activeTab === 'problems'
                     ? 'border-secondary text-secondary'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -401,13 +517,23 @@ export const AdminHackathons: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('rules')}
-                className={`pb-3 border-b-2 transition-colors ${
+                className={`pb-3 border-b-2 transition-colors flex items-center gap-1.5 shrink-0 ${
                   activeTab === 'rules'
                     ? 'border-secondary text-secondary'
                     : 'border-transparent text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Rules & Prizes
+                Rules & Prizes ({(editingItem.rules?.length || 0) + (editingItem.prizes?.length || 0)})
+              </button>
+              <button
+                onClick={() => setActiveTab('winners')}
+                className={`pb-3 border-b-2 transition-colors flex items-center gap-1.5 shrink-0 ${
+                  activeTab === 'winners'
+                    ? 'border-secondary text-secondary'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Past Winners ({editingItem.winning_solutions?.length || 0})
               </button>
             </div>
 
@@ -804,61 +930,170 @@ export const AdminHackathons: React.FC = () => {
               )}
 
               {activeTab === 'rules' && (
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[10px] font-bold uppercase text-slate-400">
-                        Competition Rules ({editingItem.rules?.length || 0} configured)
-                      </label>
-                      <span className="text-[10px] text-slate-500">One rule per line</span>
+                <div className="space-y-6">
+                  {/* Rules Management */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div>
+                        <label className="text-xs font-bold uppercase text-white flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-secondary" />
+                          Competition Rules ({editingItem.rules?.length || 0})
+                        </label>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Specify official participation directives, submission constraints, and evaluation rules.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddRule}
+                        className="px-3 py-1 bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Rule</span>
+                      </button>
                     </div>
-                    <textarea
-                      rows={5}
-                      value={(editingItem.rules || []).join('\n')}
-                      onChange={e => {
-                        const lines = e.target.value.split('\n').map(l => l.trim()).filter(Boolean);
-                        setEditingItem({
-                          ...editingItem,
-                          rules: lines
-                        });
-                      }}
-                      placeholder="Enter each rule on a new line...&#10;Teams must consist of 2 to 4 eligible developers.&#10;All code submissions must be licensed for architecture review.&#10;Pre-built closed solutions are disqualified."
-                      className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs leading-relaxed font-mono focus:outline-none focus:border-secondary"
-                    />
-                    <p className="text-[11px] text-slate-500">
-                      Deleting all rules and saving will permanently remove them from the public page. No default rules will regenerate.
-                    </p>
+
+                    {(!editingItem.rules || editingItem.rules.length === 0) ? (
+                      <div className="p-4 rounded-lg bg-[#07111e] border border-dashed border-slate-800 text-center">
+                        <p className="text-xs text-slate-400">
+                          No rules configured. The rules section will be hidden on the public site.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {editingItem.rules.map((rule, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2 p-2 rounded-lg bg-[#07111e] border border-slate-800 group hover:border-slate-700 transition-colors"
+                          >
+                            <span className="w-6 h-6 rounded bg-[#0a192f] border border-slate-700 text-slate-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">
+                              {idx + 1}
+                            </span>
+                            <input
+                              type="text"
+                              value={rule}
+                              onChange={e => handleUpdateRule(idx, e.target.value)}
+                              placeholder="e.g. Teams must consist of 2 to 4 eligible developers."
+                              className="flex-1 px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
+                            />
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveRule(idx, 'up')}
+                                title="Move up"
+                                className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded hover:bg-slate-800 transition-colors"
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === (editingItem.rules?.length || 0) - 1}
+                                onClick={() => handleMoveRule(idx, 'down')}
+                                title="Move down"
+                                className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded hover:bg-slate-800 transition-colors"
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveRule(idx)}
+                                title="Delete rule"
+                                className="p-1.5 text-rose-400 hover:text-rose-300 rounded hover:bg-rose-950/30 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="block text-[10px] font-bold uppercase text-slate-400">
-                        Prizes & Recognition ({editingItem.prizes?.length || 0} configured)
-                      </label>
-                      <span className="text-[10px] text-slate-500">One prize tier per line</span>
+                  {/* Prizes Management */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                      <div>
+                        <label className="text-xs font-bold uppercase text-white flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-secondary" />
+                          Prizes & Recognition ({editingItem.prizes?.length || 0})
+                        </label>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Configure prize tiers, grant awards, cash incentives, and incubation stipends.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddPrize}
+                        className="px-3 py-1 bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Prize</span>
+                      </button>
                     </div>
-                    <textarea
-                      rows={5}
-                      value={(editingItem.prizes || []).join('\n')}
-                      onChange={e => {
-                        const lines = e.target.value.split('\n').map(l => l.trim()).filter(Boolean);
-                        setEditingItem({
-                          ...editingItem,
-                          prizes: lines
-                        });
-                      }}
-                      placeholder="Enter each prize tier on a new line...&#10;1st Place: INR 5,00,000 + Incubation at Ravan Tech Park&#10;2nd Place: INR 2,50,000 + Cloud Computing Credits&#10;3rd Place: INR 1,00,000"
-                      className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs leading-relaxed font-mono focus:outline-none focus:border-secondary"
-                    />
-                    <p className="text-[11px] text-slate-500">
-                      Deleting all prizes and saving will permanently remove them from the public page. No default prizes will regenerate.
-                    </p>
+
+                    {(!editingItem.prizes || editingItem.prizes.length === 0) ? (
+                      <div className="p-4 rounded-lg bg-[#07111e] border border-dashed border-slate-800 text-center">
+                        <p className="text-xs text-slate-400">
+                          No prizes configured. The prizes section will be hidden on the public site.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {editingItem.prizes.map((prize, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2 p-2 rounded-lg bg-[#07111e] border border-slate-800 group hover:border-slate-700 transition-colors"
+                          >
+                            <span className="w-6 h-6 rounded bg-[#0a192f] border border-slate-700 text-secondary text-xs font-mono font-bold flex items-center justify-center shrink-0">
+                              <Award className="w-3.5 h-3.5" />
+                            </span>
+                            <input
+                              type="text"
+                              value={prize}
+                              onChange={e => handleUpdatePrize(idx, e.target.value)}
+                              placeholder="e.g. 1st Place: INR 5,00,000 + Incubation at Ravan Tech Park"
+                              className="flex-1 px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
+                            />
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMovePrize(idx, 'up')}
+                                title="Move up"
+                                className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded hover:bg-slate-800 transition-colors"
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === (editingItem.prizes?.length || 0) - 1}
+                                onClick={() => handleMovePrize(idx, 'down')}
+                                title="Move down"
+                                className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded hover:bg-slate-800 transition-colors"
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePrize(idx)}
+                                title="Delete prize"
+                                className="p-1.5 text-rose-400 hover:text-rose-300 rounded hover:bg-rose-950/30 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Eligibility & Contact */}
+                  <div className="pt-2 border-t border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
-                        Eligibility Criteria
+                        Eligibility Criteria (Optional)
                       </label>
                       <input
                         type="text"
@@ -867,20 +1102,158 @@ export const AdminHackathons: React.FC = () => {
                         placeholder="e.g. Open to developers and researchers worldwide."
                         className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                       />
+                      <p className="text-[10px] text-slate-500 mt-1">If blank, no eligibility block will be shown on the public site.</p>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
-                        Contact Info
+                        Official Contact Info (Optional)
                       </label>
                       <input
                         type="text"
                         value={editingItem.contact_info || ''}
                         onChange={e => setEditingItem({ ...editingItem, contact_info: e.target.value })}
-                        placeholder="e.g. contact@ravantechnologies.in"
+                        placeholder="e.g. hackathons@ravantechnologies.in"
                         className="w-full px-3 py-2 rounded bg-[#07111e] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
                       />
+                      <p className="text-[10px] text-slate-500 mt-1">If blank, no contact block will be shown on the public site.</p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'winners' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div>
+                      <label className="text-xs font-bold uppercase text-white flex items-center gap-2">
+                        <Award className="w-4 h-4 text-secondary" />
+                        Previous Cohort Winners / Hall of Fame ({editingItem.winning_solutions?.length || 0})
+                      </label>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Manage past cohort winner highlights. If you delete all entries, the Hall of Fame section is hidden from the public page.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddWinner}
+                      className="px-3 py-1 bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 rounded text-xs font-semibold flex items-center gap-1 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Winner</span>
+                    </button>
+                  </div>
+
+                  {(!editingItem.winning_solutions || editingItem.winning_solutions.length === 0) ? (
+                    <div className="p-6 rounded-lg bg-[#07111e] border border-dashed border-slate-800 text-center">
+                      <Award className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                      <p className="text-xs text-slate-300 font-semibold mb-1">
+                        No past winners configured
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        The Previous Cohort Winners / Hall of Fame section is completely hidden from the public frontend.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {editingItem.winning_solutions.map((w, idx) => (
+                        <div
+                          key={idx}
+                          className="p-4 rounded-lg bg-[#07111e] border border-slate-800 space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded bg-secondary/20 text-secondary text-xs font-bold flex items-center justify-center">
+                                #{idx + 1}
+                              </span>
+                              <span className="text-xs font-bold text-white">
+                                {w.rank || `Winner Tier #${idx + 1}`}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => handleMoveWinner(idx, 'up')}
+                                title="Move up"
+                                className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded hover:bg-slate-800 transition-colors"
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === (editingItem.winning_solutions?.length || 0) - 1}
+                                onClick={() => handleMoveWinner(idx, 'down')}
+                                title="Move down"
+                                className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 rounded hover:bg-slate-800 transition-colors"
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveWinner(idx)}
+                                title="Delete winner"
+                                className="p-1.5 text-rose-400 hover:text-rose-300 rounded hover:bg-rose-950/30 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                Rank / Award Title
+                              </label>
+                              <input
+                                type="text"
+                                value={w.rank || ''}
+                                onChange={e => handleUpdateWinner(idx, 'rank', e.target.value)}
+                                placeholder="e.g. 1st Place — Vol. III"
+                                className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                Project / Solution Name
+                              </label>
+                              <input
+                                type="text"
+                                value={w.project_name || ''}
+                                onChange={e => handleUpdateWinner(idx, 'project_name', e.target.value)}
+                                placeholder="e.g. Helios Grid Allocator"
+                                className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                                Team / Participant Name
+                              </label>
+                              <input
+                                type="text"
+                                value={w.team_name || ''}
+                                onChange={e => handleUpdateWinner(idx, 'team_name', e.target.value)}
+                                placeholder="e.g. Team Apex"
+                                className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs focus:outline-none focus:border-secondary"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">
+                              Description / Architecture Highlights
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={w.description || ''}
+                              onChange={e => handleUpdateWinner(idx, 'description', e.target.value)}
+                              placeholder="Describe the solution architecture or competition accomplishments..."
+                              className="w-full px-3 py-1.5 rounded bg-[#0a192f] border border-slate-700 text-white text-xs leading-relaxed focus:outline-none focus:border-secondary"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

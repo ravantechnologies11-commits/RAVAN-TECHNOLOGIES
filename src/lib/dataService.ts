@@ -1718,9 +1718,10 @@ export const dataService = {
     if (list && list.length > 0) {
       return list.find(h => h.status !== 'draft') || null;
     }
-    const entry = memoryCache.getEntry<HackathonItem>('hackathon');
+    const entry = memoryCache.getEntry<HackathonItem>('hackathon') || memoryCache.getEntry<HackathonItem>('hackathons');
     if (entry && entry.isDbVerified && entry.data && entry.data.status !== 'draft') return entry.data;
-    const meta = getLocal<{ timestamp: number; data: HackathonItem; isDbVerified?: boolean } | null>('ravan_cache_meta_hackathon', null);
+    const meta = getLocal<{ timestamp: number; data: HackathonItem; isDbVerified?: boolean } | null>('ravan_cache_meta_hackathon', null) ||
+                 getLocal<{ timestamp: number; data: HackathonItem; isDbVerified?: boolean } | null>('ravan_cache_meta_hackathons', null);
     if (meta && meta.isDbVerified && meta.data && meta.data.status !== 'draft') return meta.data;
     return null;
   },
@@ -2708,10 +2709,16 @@ export const dataService = {
     if (normalizedHackathons.length > 0) {
       setLocal('ravan_hackathon', normalizedHackathons[0]);
       memoryCache.set('hackathons', normalizedHackathons[0], true);
+      memoryCache.set('hackathon', normalizedHackathons[0], true);
     } else {
       try {
         localStorage.removeItem('ravan_hackathon');
+        localStorage.removeItem('ravan_hackathons_list');
+        localStorage.removeItem('ravan_cache_meta_hackathon');
+        localStorage.removeItem('ravan_cache_meta_hackathons');
+        localStorage.removeItem('ravan_cache_meta_hackathons_list');
         memoryCache.invalidateKey('hackathons');
+        memoryCache.invalidateKey('hackathon');
       } catch {}
     }
     memoryCache.set('hackathons_list', normalizedHackathons, true);
