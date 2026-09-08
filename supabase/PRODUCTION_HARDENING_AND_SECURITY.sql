@@ -85,7 +85,7 @@ INSERT INTO public.founders (
     'Established Ravan Tech Park spanning dedicated R&D infrastructure.',
     'Founded Ravan Hackathon series engaging engineering builders globally.'
   ],
-  '{"linkedin": "https://linkedin.com/company/ravantechnologies", "twitter": "https://twitter.com/ravantech", "email": "founder@ravantechnologies.com"}'::jsonb,
+  '{"linkedin": "https://linkedin.com/company/ravantechnologies", "twitter": "https://twitter.com/ravantech", "email": "founder@ravantechnologies.in"}'::jsonb,
   'V ABISHEK — Founder & Architect | Ravan Technologies',
   'Discover the visionary leadership and engineering philosophy behind Ravan Technologies.',
   timezone('utc'::text, now())

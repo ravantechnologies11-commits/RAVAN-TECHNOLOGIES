@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   logo_dark_url TEXT,
   logo_alt TEXT,
   favicon_url TEXT,
-  contact_email TEXT NOT NULL DEFAULT 'contact@ravantechnologies.com',
+  contact_email TEXT NOT NULL DEFAULT 'contact@ravantechnologies.in',
   contact_phone TEXT,
   whatsapp_number TEXT,
   office_address TEXT,
@@ -136,8 +136,8 @@ VALUES (
   'Building Technology. Solving Real Problems.',
   'Architecting sovereign software systems, enterprise intelligence, and physical computing infrastructure for institutional scale.',
   '/images/ravan-logo.png',
-  'contact@ravantechnologies.com',
-  'Ravan Tech Park, Outer Ring Road, Bengaluru'
+  'contact@ravantechnologies.in',
+  'No.12, Sannathi Street, Tiruvannamalai - 606601'
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS public.seo_metadata (
   meta_description TEXT NOT NULL DEFAULT 'Ravan Technologies builds sovereign digital backbones, high-concurrency systems, and applied AI infrastructure.',
   focus_keyword TEXT DEFAULT 'Enterprise AI',
   secondary_keywords JSONB DEFAULT '["High Scale Systems", "Sovereign AI", "Physical Infrastructure"]'::jsonb,
-  canonical_url TEXT NOT NULL DEFAULT 'https://ravantechnologies.com',
+  canonical_url TEXT NOT NULL DEFAULT 'https://ravantechnologies.in',
   robots_index BOOLEAN NOT NULL DEFAULT true,
   robots_follow BOOLEAN NOT NULL DEFAULT true,
   og_title TEXT DEFAULT 'Ravan Technologies — Enterprise Intelligence',
@@ -174,7 +174,7 @@ VALUES (
   'primary_seo',
   'Ravan Technologies | Sovereign Enterprise Engineering & AI',
   'Ravan Technologies builds sovereign digital backbones, high-concurrency systems, and applied AI infrastructure.',
-  'https://ravantechnologies.com'
+  'https://ravantechnologies.in'
 )
 ON CONFLICT (id) DO NOTHING;
 

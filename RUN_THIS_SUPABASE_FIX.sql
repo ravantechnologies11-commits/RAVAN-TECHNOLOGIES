@@ -14,11 +14,15 @@ BEGIN
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
     AND role IN ('super_admin', 'admin')
-    AND LOWER(email) IN (
-      'founder@ravantechnologies.com',
-      'admin@ravantechnologies.com',
-      'ceo@ravantechnologies.com',
-      'contact@ravantechnologies.com'
+    AND (
+      LOWER(email) IN (
+        'founder@ravantechnologies.in',
+        'admin@ravantechnologies.in',
+        'ceo@ravantechnologies.in',
+        'contact@ravantechnologies.in',
+        'ravantechnologies11@gmail.com'
+      )
+      OR LOWER(email) LIKE '%@ravantechnologies.in'
     )
   );
 END;
@@ -206,5 +210,5 @@ CREATE POLICY "Admin modify projects" ON public.projects FOR ALL TO authenticate
 INSERT INTO public.profiles (id, email, full_name, role)
 SELECT id, email, COALESCE(raw_user_meta_data->>'full_name', 'Executive Administrator'), 'super_admin'
 FROM auth.users
-WHERE LOWER(email) IN ('founder@ravantechnologies.com', 'admin@ravantechnologies.com', 'ceo@ravantechnologies.com')
+WHERE LOWER(email) IN ('founder@ravantechnologies.in', 'admin@ravantechnologies.in', 'ceo@ravantechnologies.in')
 ON CONFLICT (id) DO UPDATE SET role = 'super_admin';

@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
   logo_dark_url TEXT,
   logo_alt TEXT,
   favicon_url TEXT,
-  contact_email TEXT NOT NULL DEFAULT 'contact@ravantechnologies.com',
+  contact_email TEXT NOT NULL DEFAULT 'contact@ravantechnologies.in',
   contact_phone TEXT,
   whatsapp_number TEXT,
   office_address TEXT,
