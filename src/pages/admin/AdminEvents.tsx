@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
 import { EventItem } from '../../types';
-import { initialEvents } from '../../data/initialData';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import {
@@ -67,7 +66,7 @@ export const AdminEvents: React.FC = () => {
     setLoading(true);
     try {
       const data = await dataService.getEvents();
-      setEvents(data && data.length > 0 ? data : initialEvents);
+      setEvents(data || []);
     } catch (e) {
       console.error(e);
       showToast('Failed to load events from database.', 'error');

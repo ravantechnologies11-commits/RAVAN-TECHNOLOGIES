@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
 import { ProjectItem } from '../../types';
-import { initialProjects } from '../../data/initialData';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
-import { Plus, Trash2, Upload, Save, Check, FolderGit2 } from 'lucide-react';
+import { Plus, Trash2, Upload, Save, Check, FolderGit2, Loader2 } from 'lucide-react';
 
 export const AdminProjects: React.FC = () => {
   const { showToast } = useToast();
-  const [projects, setProjects] = useState<ProjectItem[]>(initialProjects);
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [activeCropIndex, setActiveCropIndex] = useState<number | null>(null);
@@ -18,8 +18,21 @@ export const AdminProjects: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<ProjectItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const loadData = () => {
+    setLoading(true);
+    dataService.getProjects().then(data => {
+      setProjects(data || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setLoading(false);
+    });
+  };
+
   useEffect(() => {
-    dataService.getProjects().then(setProjects);
+    loadData();
+    window.addEventListener('ravan_data_updated', loadData);
+    return () => window.removeEventListener('ravan_data_updated', loadData);
   }, []);
 
   const handleSaveAll = async () => {
@@ -110,7 +123,12 @@ export const AdminProjects: React.FC = () => {
           </div>
         </div>
 
-        {projects.length === 0 ? (
+        {loading ? (
+          <div className="p-16 text-center text-slate-400 bg-[#0a192f] border border-slate-800 rounded-2xl">
+            <Loader2 className="w-8 h-8 text-secondary animate-spin mx-auto mb-3" />
+            <p className="text-xs">Loading case studies from database...</p>
+          </div>
+        ) : projects.length === 0 ? (
           <div className="p-16 rounded-2xl bg-[#0a192f] border border-slate-800 text-center">
             <FolderGit2 className="w-12 h-12 text-slate-600 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-white mb-1">No Projects Found</h3>

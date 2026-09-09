@@ -39,28 +39,8 @@ import {
 
 import {
   initialFounder,
-  initialFounders,
-  initialLeadership,
-  initialServices,
-  initialSolutions,
-  initialProjects,
-  initialHackathon,
-  initialLearningPrograms,
-  initialEcosystem,
-  initialMedia,
-  initialEnquiries,
   initialSiteSettings,
-  initialSEOSettings,
-  initialAuditLogs,
-  initialNavigation,
-  initialGalleryAlbums,
-  initialBlogPosts,
-  initialEvents,
-  initialTestimonials,
-  initialPartners,
-  initialClients,
-  initialRoles,
-  initialAIMLModels
+  initialSEOSettings
 } from '../data/initialData';
 import { validateContactPayload, sanitizeUrl } from './securityUtils';
 
@@ -1199,7 +1179,21 @@ export function mapHackathonForLegacyDb(h: HackathonItem) {
 
 export function normalizeLearningProgram(raw: any, idx: number = 0): LearningProgram {
   if (!raw) {
-    return (initialLearningPrograms[idx] || initialLearningPrograms[0]);
+    return {
+      id: `program-${idx + 1}`,
+      title: 'New Learning Program',
+      slug: `learning-program-${idx + 1}`,
+      track_name: 'Engineering Track',
+      badge: 'TRAINING',
+      description: '',
+      enrolled_count: '0',
+      image_url: '',
+      methodology_phase: 'Foundation',
+      prerequisites: [],
+      curriculum: [],
+      display_order: idx + 1,
+      status: 'draft'
+    };
   }
 
   // Unpack metadata from 'modules' if packed as object
@@ -1573,8 +1567,8 @@ export const dataService = {
   getFoundersSync(): Founder[] {
     const cached = memoryCache.get<Founder[]>('founders');
     if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<Founder[]>('ravan_founders', initialFounders);
-    const source = (Array.isArray(local) && local.length > 0) ? local : initialFounders;
+    const local = getLocal<Founder[]>('ravan_founders', []);
+    const source = (Array.isArray(local) && local.length > 0) ? local : [];
     const mapped = source.map((item, idx) => normalizeFounder(item, idx));
     mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
     memoryCache.set('founders', mapped);
@@ -1585,10 +1579,10 @@ export const dataService = {
     return memoryCache.get('founders') !== null || (typeof window !== 'undefined' && !!localStorage.getItem('ravan_founders'));
   },
 
-  getFounderSync(): Founder {
+  getFounderSync(): Founder | null {
     const founders = this.getFoundersSync();
     const published = founders.filter(f => f.status === 'published');
-    return published[0] || founders[0] || normalizeFounder(initialFounder);
+    return published[0] || founders[0] || null;
   },
 
   getFounderBySlugSync(slug: string): Founder | null {
@@ -1621,8 +1615,8 @@ export const dataService = {
   getLeadershipSync(): LeadershipMember[] {
     const cached = memoryCache.get<LeadershipMember[]>('leadership');
     if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<LeadershipMember[]>('ravan_leadership', initialLeadership);
-    const source = (Array.isArray(local) && local.length > 0) ? local : initialLeadership;
+    const local = getLocal<LeadershipMember[]>('ravan_leadership', []);
+    const source = (Array.isArray(local) && local.length > 0) ? local : [];
     const mapped = source.map(normalizeLeadershipMember);
     mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
     memoryCache.set('leadership', mapped);
@@ -1683,11 +1677,11 @@ export const dataService = {
     if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
     const meta = getLocal<{ timestamp: number; data: SolutionItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_solutions', null);
     if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
-    return initialSolutions;
+    return null;
   },
 
   getSolutionsSync(): SolutionItem[] {
-    return this.getCachedSolutions() || initialSolutions;
+    return this.getCachedSolutions() || [];
   },
 
   getCachedProjects(): ProjectItem[] | null {
@@ -1829,11 +1823,11 @@ export const dataService = {
     if (entry && entry.isDbVerified && Array.isArray(entry.data)) return entry.data;
     const meta = getLocal<{ timestamp: number; data: PartnerItem[]; isDbVerified?: boolean } | null>('ravan_cache_meta_partners', null);
     if (meta && meta.isDbVerified && Array.isArray(meta.data)) return meta.data;
-    return initialPartners;
+    return null;
   },
 
   getPartnersSync(): PartnerItem[] {
-    return this.getCachedPartners() || initialPartners;
+    return this.getCachedPartners() || [];
   },
 
   getCachedClients(): ClientItem[] | null {
@@ -1851,8 +1845,8 @@ export const dataService = {
   getNavigationSync(): NavigationItem[] {
     const cached = memoryCache.get<NavigationItem[]>('navigation');
     if (cached && Array.isArray(cached) && cached.length > 0) return cached;
-    const local = getLocal<NavigationItem[]>('ravan_navigation', initialNavigation);
-    const result = (Array.isArray(local) && local.length > 0) ? local : initialNavigation;
+    const local = getLocal<NavigationItem[]>('ravan_navigation', []);
+    const result = Array.isArray(local) ? local : [];
     memoryCache.set('navigation', result);
     return result;
   },
@@ -2049,7 +2043,7 @@ export const dataService = {
   // --- FOUNDERS MANAGEMENT ---
   async getFounders(forceRefresh: boolean = false): Promise<Founder[]> {
     return memoryCache.swrFetch('founders', async () => {
-      const local = getLocal<Founder[]>('ravan_founders', initialFounders);
+      const local = getLocal<Founder[]>('ravan_founders', []);
       try {
         if (supabase) {
           let data: any[] | null = null;
@@ -2077,15 +2071,15 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getFounders fallback:', err);
       }
-      const mapped = (Array.isArray(local) && local.length > 0 ? local : initialFounders).map((item, idx) => normalizeFounder(item, idx));
+      const mapped = (Array.isArray(local) ? local : []).map((item, idx) => normalizeFounder(item, idx));
       mapped.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       return mapped;
     }, { forceRefresh });
   },
 
-  async getFounder(forceRefresh: boolean = false): Promise<Founder> {
+  async getFounder(forceRefresh: boolean = false): Promise<Founder | null> {
     const founders = await this.getFounders(forceRefresh);
-    return founders[0] || normalizeFounder(initialFounder);
+    return founders[0] || null;
   },
 
   async getFounderBySlug(slug: string): Promise<Founder | null> {
@@ -2189,35 +2183,52 @@ export const dataService = {
         return payload;
       });
 
-      const { error } = await supabase.from('founders').upsert(rowsForDb);
-      if (error) {
-        // Fallback without dynamic columns if table lacks them
-        const corePayloads = rowsForDb.map(r => {
-          const { slug, company_branch, display_order, status, ...rest } = r;
-          return rest;
-        });
-        const fallbackRes = await supabase.from('founders').upsert(corePayloads);
-        if (fallbackRes.error) {
-          if (import.meta.env.DEV) console.error('Supabase error saving founders:', fallbackRes.error.message);
-          throw formatSupabaseError(fallbackRes.error, 'founders');
+      // 1. Detect and purge deleted founder records
+      try {
+        const { data: existing } = await supabase.from('founders').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(normalized.map(f => f.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('founders').delete().in('id', toDelete);
+          }
         }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase founders deletion sync notice:', delErr);
       }
 
-      // CONFIRMED DATABASE READ-BACK VERIFICATION
-      const ids = normalized.map(f => f.id);
-      const { data: verifiedRows, error: verifyErr } = await supabase
-        .from('founders')
-        .select('*')
-        .in('id', ids);
+      // 2. Upsert remaining items
+      if (normalized.length > 0) {
+        const { error } = await supabase.from('founders').upsert(rowsForDb);
+        if (error) {
+          // Fallback without dynamic columns if table lacks them
+          const corePayloads = rowsForDb.map(r => {
+            const { slug, company_branch, display_order, status, ...rest } = r;
+            return rest;
+          });
+          const fallbackRes = await supabase.from('founders').upsert(corePayloads);
+          if (fallbackRes.error) {
+            if (import.meta.env.DEV) console.error('Supabase error saving founders:', fallbackRes.error.message);
+            throw formatSupabaseError(fallbackRes.error, 'founders');
+          }
+        }
 
-      if (verifyErr) {
-        throw new Error(`Database persistence verification failed for Founders: ${verifyErr.message}`);
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = normalized.map(f => f.id);
+        const { data: verifiedRows, error: verifyErr } = await supabase
+          .from('founders')
+          .select('*')
+          .in('id', ids);
+
+        if (verifyErr) {
+          throw new Error(`Database persistence verification failed for Founders: ${verifyErr.message}`);
+        }
+        if (!verifiedRows || verifiedRows.length !== ids.length) {
+          throw new Error(`Database persistence verification mismatch: Saved ${ids.length} founders, but database confirmed ${verifiedRows ? verifiedRows.length : 0}`);
+        }
+        normalized = verifiedRows.map((item, idx) => normalizeFounder(item, idx));
+        normalized.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       }
-      if (!verifiedRows || verifiedRows.length !== ids.length) {
-        throw new Error(`Database persistence verification mismatch: Saved ${ids.length} founders, but database confirmed ${verifiedRows ? verifiedRows.length : 0}`);
-      }
-      normalized = verifiedRows.map((item, idx) => normalizeFounder(item, idx));
-      normalized.sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
     }
 
     setLocal('ravan_founders', normalized);
@@ -2256,7 +2267,7 @@ export const dataService = {
   // --- LEADERSHIP ---
   async getLeadership(forceRefresh: boolean = false): Promise<LeadershipMember[]> {
     return memoryCache.swrFetch('leadership', async () => {
-      const local = getLocal<LeadershipMember[]>('ravan_leadership', initialLeadership);
+      const local = getLocal<LeadershipMember[]>('ravan_leadership', []);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('leadership').select('*').order('display_order');
@@ -2269,7 +2280,7 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getLeadership fallback:', err);
       }
-      return (Array.isArray(local) && local.length > 0 ? local : initialLeadership).map(normalizeLeadershipMember);
+      return (Array.isArray(local) ? local : []).map(normalizeLeadershipMember);
     }, { forceRefresh });
   },
 
@@ -2367,19 +2378,36 @@ export const dataService = {
         };
       });
 
-      const { error } = await supabase.from('leadership').upsert(rowsForDb);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving leadership:', error.message);
-        throw formatSupabaseError(error, 'leadership');
+      // 1. Detect and purge deleted leadership records
+      try {
+        const { data: existing } = await supabase.from('leadership').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(normalizedMembers.map(m => m.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('leadership').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase leadership deletion sync notice:', delErr);
       }
 
-      // CONFIRMED DATABASE READ-BACK VERIFICATION
-      const ids = normalizedMembers.map(m => m.id);
-      const { data: verified, error: verifyErr } = await supabase.from('leadership').select('*').in('id', ids);
-      if (verifyErr || !verified || verified.length !== ids.length) {
-        throw new Error(`Database verification mismatch for Leadership: ${verifyErr?.message || `Expected ${ids.length} records, found ${verified?.length || 0}`}`);
+      // 2. Upsert remaining items
+      if (normalizedMembers.length > 0) {
+        const { error } = await supabase.from('leadership').upsert(rowsForDb);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving leadership:', error.message);
+          throw formatSupabaseError(error, 'leadership');
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = normalizedMembers.map(m => m.id);
+        const { data: verified, error: verifyErr } = await supabase.from('leadership').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Leadership: ${verifyErr?.message || `Expected ${ids.length} records, found ${verified?.length || 0}`}`);
+        }
+        normalizedMembers = verified.map(normalizeLeadershipMember);
       }
-      normalizedMembers = verified.map(normalizeLeadershipMember);
     }
 
     setLocal('ravan_leadership', normalizedMembers);
@@ -2483,7 +2511,8 @@ export const dataService = {
       if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
         return verified.data;
       }
-      return initialSolutions.map((item, idx) => normalizeSolution(item, idx));
+      const local = getLocal<SolutionItem[]>('ravan_solutions', []);
+      return Array.isArray(local) ? local : [];
     }, { forceRefresh });
   },
 
@@ -2995,18 +3024,35 @@ export const dataService = {
   },
 
   async saveEcosystem(items: EcosystemItem[]): Promise<EcosystemItem[]> {
-    if (supabase && items.length > 0) {
-      const { error } = await supabase.from('ecosystem').upsert(items);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving ecosystem:', error.message);
-        throw formatSupabaseError(error, 'ecosystem');
+    if (supabase) {
+      // 1. Detect and purge deleted ecosystem records
+      try {
+        const { data: existing } = await supabase.from('ecosystem').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(items.map(i => i.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('ecosystem').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase ecosystem deletion sync notice:', delErr);
       }
 
-      // Read-back verification
-      const ids = items.map(i => i.id);
-      const { data: verified, error: verifyErr } = await supabase.from('ecosystem').select('*').in('id', ids);
-      if (verifyErr || !verified || verified.length !== ids.length) {
-        throw new Error(`Database verification mismatch for Ecosystem: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+      // 2. Upsert remaining items
+      if (items.length > 0) {
+        const { error } = await supabase.from('ecosystem').upsert(items);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving ecosystem:', error.message);
+          throw formatSupabaseError(error, 'ecosystem');
+        }
+
+        // Read-back verification
+        const ids = items.map(i => i.id);
+        const { data: verified, error: verifyErr } = await supabase.from('ecosystem').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Ecosystem: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
@@ -3059,18 +3105,35 @@ export const dataService = {
   },
 
   async saveMedia(items: MediaItem[]): Promise<MediaItem[]> {
-    if (supabase && items.length > 0) {
-      const { error } = await supabase.from('media').upsert(items);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving media:', error.message);
-        throw formatSupabaseError(error, 'media');
+    if (supabase) {
+      // 1. Detect and purge deleted media records
+      try {
+        const { data: existing } = await supabase.from('media').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(items.map(m => m.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('media').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase media deletion sync notice:', delErr);
       }
 
-      // Read-back verification
-      const ids = items.map(m => m.id);
-      const { data: verified, error: verifyErr } = await supabase.from('media').select('*').in('id', ids);
-      if (verifyErr || !verified || verified.length !== ids.length) {
-        throw new Error(`Database verification mismatch for Media: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+      // 2. Upsert remaining items
+      if (items.length > 0) {
+        const { error } = await supabase.from('media').upsert(items);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving media:', error.message);
+          throw formatSupabaseError(error, 'media');
+        }
+
+        // Read-back verification
+        const ids = items.map(m => m.id);
+        const { data: verified, error: verifyErr } = await supabase.from('media').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Media: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
@@ -3106,7 +3169,7 @@ export const dataService = {
   // --- CONTACT ENQUIRIES & DIRECTIVES AUTOMATION ---
   async getEnquiries(): Promise<ContactEnquiry[]> {
     return memoryCache.dedupedFetch('enquiries', async () => {
-      const local = getLocal<ContactEnquiry[]>('ravan_enquiries', initialEnquiries);
+      const local = getLocal<ContactEnquiry[]>('ravan_enquiries', []);
       try {
         if (supabase) {
           const { data, error } = await supabase
@@ -3122,7 +3185,7 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getEnquiries fallback:', err);
       }
-      return local;
+      return Array.isArray(local) ? local : [];
     });
   },
 
@@ -3459,7 +3522,7 @@ export const dataService = {
       });
     }
 
-    if (!founder.bio || founder.bio.length < 150) {
+    if (!founder || !founder.bio || founder.bio.length < 150) {
       issues.push({
         page_route: '/founder',
         severity: 'warning',
@@ -3474,7 +3537,7 @@ export const dataService = {
   // --- NAVIGATION ---
   async getNavigation(forceRefresh: boolean = false): Promise<NavigationItem[]> {
     return memoryCache.swrFetch('navigation', async () => {
-      const local = getLocal<NavigationItem[]>('ravan_navigation', initialNavigation);
+      const local = getLocal<NavigationItem[]>('ravan_navigation', []);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('navigation').select('*').order('display_order');
@@ -3486,7 +3549,7 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getNavigation fallback:', err);
       }
-      return Array.isArray(local) && local.length > 0 ? local : initialNavigation;
+      return Array.isArray(local) ? local : [];
     }, { forceRefresh });
   },
 
@@ -3555,22 +3618,37 @@ export const dataService = {
   },
 
   async saveGalleryAlbums(albums: GalleryAlbum[]): Promise<GalleryAlbum[]> {
-    if (supabase && albums.length > 0) {
-      const { error } = await supabase.from('gallery_albums').upsert(albums);
-      if (error) {
-        const isTableMissing = error.message.includes('schema cache') || error.message.includes('Could not find the table');
-        if (isTableMissing) {
-          if (import.meta.env.DEV) console.warn('Supabase gallery_albums table missing; saving to local cache. Run migration 00003 to enable database sync.');
-        } else {
-          if (import.meta.env.DEV) console.error('Supabase error saving gallery_albums:', error.message);
-          throw formatSupabaseError(error, 'gallery_albums');
+    if (supabase) {
+      try {
+        const { data: existing } = await supabase.from('gallery_albums').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(albums.map(a => a.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('gallery_albums').delete().in('id', toDelete);
+          }
         }
-      } else {
-        // CONFIRMED DATABASE READ-BACK VERIFICATION
-        const ids = albums.map(a => a.id);
-        const { data: verified, error: verifyErr } = await supabase.from('gallery_albums').select('*').in('id', ids);
-        if (verifyErr || !verified || verified.length !== ids.length) {
-          throw new Error(`Database verification mismatch for Gallery Albums: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase gallery_albums deletion sync notice:', delErr);
+      }
+
+      if (albums.length > 0) {
+        const { error } = await supabase.from('gallery_albums').upsert(albums);
+        if (error) {
+          const isTableMissing = error.message.includes('schema cache') || error.message.includes('Could not find the table');
+          if (isTableMissing) {
+            if (import.meta.env.DEV) console.warn('Supabase gallery_albums table missing; saving to local cache.');
+          } else {
+            if (import.meta.env.DEV) console.error('Supabase error saving gallery_albums:', error.message);
+            throw formatSupabaseError(error, 'gallery_albums');
+          }
+        } else {
+          // CONFIRMED DATABASE READ-BACK VERIFICATION
+          const ids = albums.map(a => a.id);
+          const { data: verified, error: verifyErr } = await supabase.from('gallery_albums').select('*').in('id', ids);
+          if (verifyErr || !verified || verified.length !== ids.length) {
+            throw new Error(`Database verification mismatch for Gallery Albums: ${verifyErr?.message || `Expected ${ids.length}, found ${verified?.length || 0}`}`);
+          }
         }
       }
     }
@@ -3633,18 +3711,35 @@ export const dataService = {
   },
 
   async saveBlogPosts(posts: BlogPost[]): Promise<BlogPost[]> {
-    if (supabase && posts.length > 0) {
-      const { error } = await supabase.from('blog_posts').upsert(posts);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving blog_posts:', error.message);
-        throw formatSupabaseError(error, 'blog_posts');
+    if (supabase) {
+      // 1. Detect and purge deleted blog posts
+      try {
+        const { data: existing } = await supabase.from('blog_posts').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(posts.map(p => p.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('blog_posts').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase blog_posts deletion sync notice:', delErr);
       }
 
-      // CONFIRMED DATABASE READ-BACK VERIFICATION
-      const ids = posts.map(p => p.id);
-      const { data: verified, error: verifyErr } = await supabase.from('blog_posts').select('*').in('id', ids);
-      if (verifyErr || !verified || verified.length !== ids.length) {
-        throw new Error(`Database verification mismatch for Blog Posts: ${verifyErr?.message || `Expected ${ids.length} posts, found ${verified?.length || 0}`}`);
+      // 2. Upsert remaining items
+      if (posts.length > 0) {
+        const { error } = await supabase.from('blog_posts').upsert(posts);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving blog_posts:', error.message);
+          throw formatSupabaseError(error, 'blog_posts');
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = posts.map(p => p.id);
+        const { data: verified, error: verifyErr } = await supabase.from('blog_posts').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Blog Posts: ${verifyErr?.message || `Expected ${ids.length} posts, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
@@ -3697,18 +3792,35 @@ export const dataService = {
   },
 
   async saveEvents(events: EventItem[]): Promise<EventItem[]> {
-    if (supabase && events.length > 0) {
-      const { error } = await supabase.from('events').upsert(events);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving events:', error.message);
-        throw formatSupabaseError(error, 'events');
+    if (supabase) {
+      // 1. Detect and purge deleted event records
+      try {
+        const { data: existing } = await supabase.from('events').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(events.map(e => e.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('events').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase events deletion sync notice:', delErr);
       }
 
-      // CONFIRMED DATABASE READ-BACK VERIFICATION
-      const ids = events.map(e => e.id);
-      const { data: verified, error: verifyErr } = await supabase.from('events').select('*').in('id', ids);
-      if (verifyErr || !verified || verified.length !== ids.length) {
-        throw new Error(`Database verification mismatch for Events: ${verifyErr?.message || `Expected ${ids.length} events, found ${verified?.length || 0}`}`);
+      // 2. Upsert remaining items
+      if (events.length > 0) {
+        const { error } = await supabase.from('events').upsert(events);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving events:', error.message);
+          throw formatSupabaseError(error, 'events');
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = events.map(e => e.id);
+        const { data: verified, error: verifyErr } = await supabase.from('events').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Events: ${verifyErr?.message || `Expected ${ids.length} events, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
@@ -3761,18 +3873,35 @@ export const dataService = {
   },
 
   async saveTestimonials(items: TestimonialItem[]): Promise<TestimonialItem[]> {
-    if (supabase && items.length > 0) {
-      const { error } = await supabase.from('testimonials').upsert(items);
-      if (error) {
-        if (import.meta.env.DEV) console.error('Supabase error saving testimonials:', error.message);
-        throw formatSupabaseError(error, 'testimonials');
+    if (supabase) {
+      // 1. Detect and purge deleted testimonial records
+      try {
+        const { data: existing } = await supabase.from('testimonials').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(items.map(t => t.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('testimonials').delete().in('id', toDelete);
+          }
+        }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase testimonials deletion sync notice:', delErr);
       }
 
-      // CONFIRMED DATABASE READ-BACK VERIFICATION
-      const ids = items.map(t => t.id);
-      const { data: verified, error: verifyErr } = await supabase.from('testimonials').select('*').in('id', ids);
-      if (verifyErr || !verified || verified.length !== ids.length) {
-        throw new Error(`Database verification mismatch for Testimonials: ${verifyErr?.message || `Expected ${ids.length} items, found ${verified?.length || 0}`}`);
+      // 2. Upsert remaining items
+      if (items.length > 0) {
+        const { error } = await supabase.from('testimonials').upsert(items);
+        if (error) {
+          if (import.meta.env.DEV) console.error('Supabase error saving testimonials:', error.message);
+          throw formatSupabaseError(error, 'testimonials');
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = items.map(t => t.id);
+        const { data: verified, error: verifyErr } = await supabase.from('testimonials').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Testimonials: ${verifyErr?.message || `Expected ${ids.length} items, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
@@ -3820,37 +3949,55 @@ export const dataService = {
       if (verified && verified.isDbVerified && Array.isArray(verified.data)) {
         return verified.data;
       }
-      return initialPartners;
+      const local = getLocal<PartnerItem[]>('ravan_partners', []);
+      return Array.isArray(local) ? local : [];
     }, { forceRefresh });
   },
 
   async savePartners(items: PartnerItem[]): Promise<PartnerItem[]> {
-    if (supabase && items.length > 0) {
-      const { error } = await supabase.from('partners').upsert(items);
-      if (error) {
-        // Fallback with core columns if status/description are omitted in DB schema
-        try {
-          const coreItems = items.map(p => ({
-            id: p.id,
-            name: p.name,
-            logo_url: p.logo_url,
-            website_url: p.website_url || '',
-            category: p.category,
-            display_order: p.display_order
-          }));
-          const { error: coreErr } = await supabase.from('partners').upsert(coreItems);
-          if (coreErr) throw formatSupabaseError(coreErr, 'partners');
-        } catch (coreErr: any) {
-          if (import.meta.env.DEV) console.error('Supabase error saving partners:', error.message);
-          throw formatSupabaseError(error, 'partners');
+    if (supabase) {
+      // 1. Detect and purge deleted partner records
+      try {
+        const { data: existing } = await supabase.from('partners').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(items.map(p => p.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('partners').delete().in('id', toDelete);
+          }
         }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase partners deletion sync notice:', delErr);
       }
 
-      // CONFIRMED DATABASE READ-BACK VERIFICATION
-      const ids = items.map(p => p.id);
-      const { data: verified, error: verifyErr } = await supabase.from('partners').select('*').in('id', ids);
-      if (verifyErr || !verified || verified.length !== ids.length) {
-        throw new Error(`Database verification mismatch for Partners: ${verifyErr?.message || `Expected ${ids.length} partners, found ${verified?.length || 0}`}`);
+      // 2. Upsert remaining items
+      if (items.length > 0) {
+        const { error } = await supabase.from('partners').upsert(items);
+        if (error) {
+          // Fallback with core columns if status/description are omitted in DB schema
+          try {
+            const coreItems = items.map(p => ({
+              id: p.id,
+              name: p.name,
+              logo_url: p.logo_url,
+              website_url: p.website_url || '',
+              category: p.category,
+              display_order: p.display_order
+            }));
+            const { error: coreErr } = await supabase.from('partners').upsert(coreItems);
+            if (coreErr) throw formatSupabaseError(coreErr, 'partners');
+          } catch (coreErr: any) {
+            if (import.meta.env.DEV) console.error('Supabase error saving partners:', error.message);
+            throw formatSupabaseError(error, 'partners');
+          }
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = items.map(p => p.id);
+        const { data: verified, error: verifyErr } = await supabase.from('partners').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Partners: ${verifyErr?.message || `Expected ${ids.length} partners, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
@@ -3897,30 +4044,47 @@ export const dataService = {
   },
 
   async saveClients(items: ClientItem[]): Promise<ClientItem[]> {
-    if (supabase && items.length > 0) {
-      const { error } = await supabase.from('clients').upsert(items);
-      if (error) {
-        try {
-          const coreItems = items.map(c => ({
-            id: c.id,
-            name: c.name,
-            logo_url: c.logo_url,
-            display_order: typeof c.display_order === 'number' ? c.display_order : 0,
-            is_active: c.status !== 'draft'
-          }));
-          const { error: coreErr } = await supabase.from('clients').upsert(coreItems);
-          if (coreErr) throw formatSupabaseError(coreErr, 'clients');
-        } catch (coreErr: any) {
-          if (import.meta.env.DEV) console.error('Supabase error saving clients:', error.message);
-          throw formatSupabaseError(error, 'clients');
+    if (supabase) {
+      // 1. Detect and purge deleted client records
+      try {
+        const { data: existing } = await supabase.from('clients').select('id');
+        if (Array.isArray(existing)) {
+          const newIds = new Set(items.map(c => c.id));
+          const toDelete = existing.filter(e => !newIds.has(e.id)).map(e => e.id);
+          if (toDelete.length > 0) {
+            await supabase.from('clients').delete().in('id', toDelete);
+          }
         }
+      } catch (delErr) {
+        if (import.meta.env.DEV) console.warn('Supabase clients deletion sync notice:', delErr);
       }
 
-      // CONFIRMED DATABASE READ-BACK VERIFICATION
-      const ids = items.map(c => c.id);
-      const { data: verified, error: verifyErr } = await supabase.from('clients').select('*').in('id', ids);
-      if (verifyErr || !verified || verified.length !== ids.length) {
-        throw new Error(`Database verification mismatch for Clients: ${verifyErr?.message || `Expected ${ids.length} clients, found ${verified?.length || 0}`}`);
+      // 2. Upsert remaining items
+      if (items.length > 0) {
+        const { error } = await supabase.from('clients').upsert(items);
+        if (error) {
+          try {
+            const coreItems = items.map(c => ({
+              id: c.id,
+              name: c.name,
+              logo_url: c.logo_url,
+              display_order: typeof c.display_order === 'number' ? c.display_order : 0,
+              is_active: c.status !== 'draft'
+            }));
+            const { error: coreErr } = await supabase.from('clients').upsert(coreItems);
+            if (coreErr) throw formatSupabaseError(coreErr, 'clients');
+          } catch (coreErr: any) {
+            if (import.meta.env.DEV) console.error('Supabase error saving clients:', error.message);
+            throw formatSupabaseError(error, 'clients');
+          }
+        }
+
+        // CONFIRMED DATABASE READ-BACK VERIFICATION
+        const ids = items.map(c => c.id);
+        const { data: verified, error: verifyErr } = await supabase.from('clients').select('*').in('id', ids);
+        if (verifyErr || !verified || verified.length !== ids.length) {
+          throw new Error(`Database verification mismatch for Clients: ${verifyErr?.message || `Expected ${ids.length} clients, found ${verified?.length || 0}`}`);
+        }
       }
     }
 
@@ -3948,7 +4112,7 @@ export const dataService = {
   // --- ROLES & PERMISSIONS ---
   async getRoles(): Promise<RoleItem[]> {
     return memoryCache.dedupedFetch('roles', async () => {
-      const local = getLocal<RoleItem[]>('ravan_roles', initialRoles);
+      const local = getLocal<RoleItem[]>('ravan_roles', []);
       try {
         if (supabase) {
           const { data, error } = await supabase.from('roles').select('*');
@@ -3960,13 +4124,13 @@ export const dataService = {
       } catch (err) {
         if (import.meta.env.DEV) console.warn('Supabase getRoles fallback:', err);
       }
-      return local;
+      return Array.isArray(local) ? local : [];
     });
   },
 
   // --- AUDIT LOGGING ---
   async getAuditLogs(): Promise<AuditLog[]> {
-    const local = getLocal<AuditLog[]>('ravan_audit_logs', initialAuditLogs);
+    const local = getLocal<AuditLog[]>('ravan_audit_logs', []);
     try {
       if (supabase) {
         const { data, error } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100);
@@ -3978,7 +4142,7 @@ export const dataService = {
     } catch (err) {
       if (import.meta.env.DEV) console.warn('Supabase getAuditLogs fallback:', err);
     }
-    return local;
+    return Array.isArray(local) ? local : [];
   },
 
   async addAuditLog(action: string, entity: string, entity_id: string = '', details: string = '', user_name: string = 'Super Admin'): Promise<void> {
@@ -3992,7 +4156,7 @@ export const dataService = {
       timestamp: new Date().toISOString()
     };
 
-    const localLogs = getLocal<AuditLog[]>('ravan_audit_logs', initialAuditLogs);
+    const localLogs = getLocal<AuditLog[]>('ravan_audit_logs', []);
     const updated = [newLog, ...localLogs.slice(0, 99)];
     setLocal('ravan_audit_logs', updated);
 

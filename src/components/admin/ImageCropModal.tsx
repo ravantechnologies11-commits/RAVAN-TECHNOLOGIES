@@ -222,8 +222,15 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas 2D context not available');
 
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, exportWidth, exportHeight);
+      const isPng = originalFile.type === 'image/png' || originalFile.name.toLowerCase().endsWith('.png');
+      const isWebp = originalFile.type === 'image/webp' || originalFile.name.toLowerCase().endsWith('.webp');
+      const isTransparentSupported = isPng || isWebp;
+
+      ctx.clearRect(0, 0, exportWidth, exportHeight);
+      if (!isTransparentSupported) {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, exportWidth, exportHeight);
+      }
 
       const scaleMultiplier = exportWidth / VIEWPORT_W;
       
@@ -237,11 +244,14 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       const nh = sourceInfo.h;
       ctx.drawImage(imgRef.current, -nw / 2, -nh / 2, nw, nh);
 
+      const exportMime = isPng ? 'image/png' : isWebp ? 'image/webp' : 'image/jpeg';
+      const exportExt = isPng ? 'png' : isWebp ? 'webp' : 'jpg';
+
       const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), 'image/jpeg', 0.95);
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas toBlob failed')), exportMime, 0.95);
       });
 
-      const croppedFile = new File([blob], `cropped_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const croppedFile = new File([blob], `cropped_${Date.now()}.${exportExt}`, { type: exportMime });
       const uploadRes = await storageService.uploadImage(croppedFile, targetBucket, targetFolder);
 
       onConfirm({

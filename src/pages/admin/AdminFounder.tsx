@@ -9,7 +9,6 @@ import {
   ProfileSkill, 
   SkillCategory 
 } from '../../types';
-import { initialFounder, initialFounders } from '../../data/initialData';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { 
@@ -65,7 +64,8 @@ const SKILL_CATEGORIES: SkillCategory[] = [
 
 export const AdminFounder: React.FC = () => {
   const { showToast } = useToast();
-  const [founders, setFounders] = useState<Founder[]>(initialFounders);
+  const [founders, setFounders] = useState<Founder[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -79,12 +79,21 @@ export const AdminFounder: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<Founder | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
+  const loadData = () => {
+    setLoading(true);
     dataService.getFounders().then(loaded => {
-      if (Array.isArray(loaded) && loaded.length > 0) {
-        setFounders(loaded);
-      }
+      setFounders(loaded || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setLoading(false);
     });
+  };
+
+  useEffect(() => {
+    loadData();
+    window.addEventListener('ravan_data_updated', loadData);
+    return () => window.removeEventListener('ravan_data_updated', loadData);
   }, []);
 
   const getActiveTab = (founderId: string): string => {

@@ -3,16 +3,32 @@ import { dataService } from '../../lib/dataService';
 import { storageService } from '../../lib/storageService';
 import { useToast } from '../../context/ToastContext';
 import { GalleryAlbum } from '../../types';
-import { initialGalleryAlbums } from '../../data/initialData';
-import { Plus, Trash2, Upload, Images, Save } from 'lucide-react';
+import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
+import { Plus, Trash2, Upload, Images, Save, Loader2 } from 'lucide-react';
 
 export const AdminGallery: React.FC = () => {
   const { showToast } = useToast();
-  const [albums, setAlbums] = useState<GalleryAlbum[]>(initialGalleryAlbums);
+  const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<GalleryAlbum | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const loadData = () => {
+    setLoading(true);
+    dataService.getGalleryAlbums().then(items => {
+      setAlbums(items || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setLoading(false);
+    });
+  };
 
   useEffect(() => {
-    dataService.getGalleryAlbums().then(setAlbums);
+    loadData();
+    window.addEventListener('ravan_data_updated', loadData);
+    return () => window.removeEventListener('ravan_data_updated', loadData);
   }, []);
 
   const handleSave = async () => {
@@ -24,6 +40,22 @@ export const AdminGallery: React.FC = () => {
       showToast('Error saving albums.', 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const remaining = albums.filter(a => a.id !== deleteTarget.id);
+      setAlbums(remaining);
+      await dataService.saveGalleryAlbums(remaining);
+      showToast(`Deleted album "${deleteTarget.title}".`, 'success');
+      setDeleteTarget(null);
+    } catch {
+      showToast('Failed to delete album.', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -71,21 +103,40 @@ export const AdminGallery: React.FC = () => {
             </button>
             <button
               onClick={handleSave}
-              disabled={isSaving}
-              className="px-6 py-2 bg-secondary text-[#0a192f] rounded text-xs font-bold uppercase hover:bg-secondary-fixed transition-colors flex items-center gap-1.5 shadow"
+              disabled={isSaving || loading}
+              className="px-6 py-2 bg-secondary text-[#0a192f] rounded text-xs font-bold uppercase hover:bg-secondary-fixed transition-colors flex items-center gap-1.5 shadow disabled:opacity-50"
             >
-              <Save className="w-4 h-4" />
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               <span>{isSaving ? 'SAVING...' : 'SAVE ALBUMS'}</span>
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {loading ? (
+        <div className="p-16 text-center text-slate-400 bg-[#0a192f] border border-slate-800 rounded-2xl max-w-5xl">
+          <Loader2 className="w-8 h-8 text-secondary animate-spin mx-auto mb-3" />
+          <p className="text-xs">Loading albums from database...</p>
+        </div>
+      ) : albums.length === 0 ? (
+        <div className="p-16 rounded-2xl bg-[#0a192f] border border-slate-800 text-center max-w-5xl">
+          <Images className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <h3 className="text-sm font-bold text-white mb-1">No Albums Found</h3>
+          <p className="text-xs text-slate-400 mb-4">Click "Create Album" to organize campus photography and film stills.</p>
+          <button
+            onClick={addAlbum}
+            className="px-4 py-2 bg-secondary text-[#0a192f] rounded text-xs font-bold uppercase"
+          >
+            Create First Album
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl">
           {albums.map((alb, idx) => (
             <div key={alb.id} className="p-6 bg-[#0a192f] border border-slate-800 rounded-xl space-y-4">
               <div className="aspect-video relative rounded-lg overflow-hidden border border-slate-700 bg-slate-900 group">
                 <img
-                  src={alb.cover_image_url}
+                  src={alb.cover_image_url || 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80'}
                   alt={alb.title}
                   className="w-full h-full object-cover"
                 />
@@ -133,10 +184,10 @@ export const AdminGallery: React.FC = () => {
               </div>
 
               <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-                <span className="text-[10px] text-slate-400">{alb.items_count || 0} Photos in Album</span>
                 <button
-                  onClick={() => setAlbums(albums.filter(a => a.id !== alb.id))}
+                  onClick={() => setDeleteTarget(alb)}
                   className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                  title="Delete Album"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -144,7 +195,16 @@ export const AdminGallery: React.FC = () => {
             </div>
           ))}
         </div>
-      </div>
+      )}
+
+      <DeleteConfirmationModal
+        isOpen={Boolean(deleteTarget)}
+        itemTitle={deleteTarget?.title}
+        itemType="album"
+        isDeleting={isDeleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 };

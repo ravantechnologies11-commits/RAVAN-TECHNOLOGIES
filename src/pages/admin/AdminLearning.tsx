@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
 import { LearningProgram, CurriculumModule } from '../../types';
-import { initialLearningPrograms } from '../../data/initialData';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import {
@@ -48,7 +47,7 @@ export const AdminLearning: React.FC = () => {
     setLoading(true);
     try {
       const data = await dataService.getLearningPrograms();
-      setPrograms(data && data.length > 0 ? data : initialLearningPrograms);
+      setPrograms(data || []);
     } catch (e) {
       console.error(e);
       showToast('Failed to load learning tracks from database.', 'error');

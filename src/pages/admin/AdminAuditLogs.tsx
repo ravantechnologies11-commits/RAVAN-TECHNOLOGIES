@@ -1,14 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { AuditLog } from '../../types';
-import { initialAuditLogs } from '../../data/initialData';
-import { ShieldCheck, Clock, User } from 'lucide-react';
+import { ShieldCheck, Clock, User, Loader2 } from 'lucide-react';
 
 export const AdminAuditLogs: React.FC = () => {
-  const [logs, setLogs] = useState<AuditLog[]>(initialAuditLogs);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadData = () => {
+    setLoading(true);
+    dataService.getAuditLogs().then(data => {
+      setLogs(data || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setLoading(false);
+    });
+  };
 
   useEffect(() => {
-    dataService.getAuditLogs().then(setLogs);
+    loadData();
+    window.addEventListener('ravan_data_updated', loadData);
+    return () => window.removeEventListener('ravan_data_updated', loadData);
   }, []);
 
   return (
@@ -18,27 +31,40 @@ export const AdminAuditLogs: React.FC = () => {
           Chronological record of all updates, creates, and publishing actions executed across the CMS.
         </p>
 
-        <div className="bg-[#0a192f] border border-slate-800 rounded-xl overflow-hidden">
-          <div className="divide-y divide-slate-800">
-            {logs.map(log => (
-              <div key={log.id} className="p-4 flex items-start justify-between gap-4 hover:bg-slate-900/40 transition-colors">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="px-2 py-0.5 bg-secondary text-[#0a192f] text-[10px] font-bold uppercase rounded">
-                      {log.action}
-                    </span>
-                    <span className="text-xs font-bold text-white">{log.entity}</span>
-                    <span className="text-xs text-slate-400">by {log.user_name}</span>
-                  </div>
-                  <p className="text-xs text-slate-300 font-mono">{log.details}</p>
-                </div>
-                <div className="text-[10px] font-mono text-slate-500 whitespace-nowrap">
-                  {new Date(log.timestamp).toLocaleString()}
-                </div>
-              </div>
-            ))}
+        {loading ? (
+          <div className="p-16 text-center text-slate-400 bg-[#0a192f] border border-slate-800 rounded-xl">
+            <Loader2 className="w-8 h-8 text-secondary animate-spin mx-auto mb-3" />
+            <p className="text-xs">Loading audit logs...</p>
           </div>
-        </div>
+        ) : logs.length === 0 ? (
+          <div className="p-16 rounded-xl bg-[#0a192f] border border-slate-800 text-center">
+            <ShieldCheck className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+            <h3 className="text-sm font-bold text-white mb-1">No Audit Logs Found</h3>
+            <p className="text-xs text-slate-400">CMS mutation activities will be recorded here automatically.</p>
+          </div>
+        ) : (
+          <div className="bg-[#0a192f] border border-slate-800 rounded-xl overflow-hidden">
+            <div className="divide-y divide-slate-800">
+              {logs.map(log => (
+                <div key={log.id} className="p-4 flex items-start justify-between gap-4 hover:bg-slate-900/40 transition-colors">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 bg-secondary text-[#0a192f] text-[10px] font-bold uppercase rounded">
+                        {log.action}
+                      </span>
+                      <span className="text-xs font-bold text-white">{log.entity}</span>
+                      <span className="text-xs text-slate-400">by {log.user_name}</span>
+                    </div>
+                    <p className="text-xs text-slate-300 font-mono">{log.details}</p>
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-500 whitespace-nowrap">
+                    {new Date(log.timestamp).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

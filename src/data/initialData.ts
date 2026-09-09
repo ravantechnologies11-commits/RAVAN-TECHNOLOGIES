@@ -140,40 +140,7 @@ export const initialLeadership: LeadershipMember[] = [
 
 export const initialServices: ServiceItem[] = [];
 
-export const initialSolutions: SolutionItem[] = [
-  {
-    id: 'sol-001',
-    slug: 'sovereign-ai-governance',
-    title: 'Sovereign AI & Data Governance Framework',
-    category: 'Applied AI',
-    description: 'An air-gapped enterprise cognitive computing framework that guarantees proprietary institutional data never leaves the organization.',
-    architecture_details: 'Runs isolated open-weights LLMs on dedicated GPU clusters with differential privacy layers and cryptographic validation of model inferences.',
-    benefits: [
-      'Absolute data sovereignty and zero third-party telemetry exposure',
-      'Compliance with strict financial and defense sector regulations',
-      'Deterministic output auditing and prompt leakage prevention'
-    ],
-    image_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-    display_order: 1,
-    status: 'published'
-  },
-  {
-    id: 'sol-002',
-    slug: 'high-concurrency-fintech-core',
-    title: 'Ultra-Low Latency Settlement Engine',
-    category: 'Distributed Systems',
-    description: 'High-throughput transactional engine capable of processing 250,000+ orders per second with deterministic sub-millisecond execution.',
-    architecture_details: 'Engineered in bare-metal Rust utilizing memory-mapped ring buffers, lock-free data structures, and kernel-bypass networking.',
-    benefits: [
-      'Sub-50 microsecond execution latency',
-      'Zero garbage collection pauses or thread contention',
-      'Immutable cryptographic ledger synchronization'
-    ],
-    image_url: 'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&w=1200&q=80',
-    display_order: 2,
-    status: 'published'
-  }
-];
+export const initialSolutions: SolutionItem[] = [];
 
 export const initialProjects: ProjectItem[] = [];
 
@@ -266,11 +233,7 @@ export const initialEvents: EventItem[] = [];
 
 export const initialTestimonials: TestimonialItem[] = [];
 
-export const initialPartners: PartnerItem[] = [
-  { id: 'part-001', name: 'NVIDIA Inception', logo_url: 'https://upload.wikimedia.org/wikipedia/commons/2/21/Nvidia_logo.svg', category: 'technology', display_order: 1, status: 'published' },
-  { id: 'part-002', name: 'Linux Foundation', logo_url: 'https://upload.wikimedia.org/wikipedia/commons/b/b5/Linux_Foundation_logo.svg', category: 'technology', display_order: 2, status: 'published' },
-  { id: 'part-003', name: 'Indian Institute of Science (IISc)', logo_url: 'https://upload.wikimedia.org/wikipedia/en/thumb/f/f9/Indian_Institute_of_Science_2019_logo.svg/1200px-Indian_Institute_of_Science_2019_logo.svg.png', category: 'academic', display_order: 3, status: 'published' }
-];
+export const initialPartners: PartnerItem[] = [];
 
 export const initialClients: ClientItem[] = [];
 

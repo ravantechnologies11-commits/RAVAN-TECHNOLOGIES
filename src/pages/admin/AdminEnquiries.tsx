@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
 import { ContactEnquiry } from '../../types';
-import { initialEnquiries } from '../../data/initialData';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { 
   Mail, 
@@ -18,12 +17,14 @@ import {
   X, 
   Send,
   AlertCircle,
-  Inbox
+  Inbox,
+  Loader2
 } from 'lucide-react';
 
 export const AdminEnquiries: React.FC = () => {
   const { showToast } = useToast();
-  const [enquiries, setEnquiries] = useState<ContactEnquiry[]>(initialEnquiries);
+  const [enquiries, setEnquiries] = useState<ContactEnquiry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
@@ -35,8 +36,16 @@ export const AdminEnquiries: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadData = async () => {
-    const data = await dataService.getEnquiries();
-    setEnquiries(data);
+    setLoading(true);
+    try {
+      const data = await dataService.getEnquiries();
+      setEnquiries(data || []);
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to load enquiries.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -172,7 +181,12 @@ export const AdminEnquiries: React.FC = () => {
         </div>
 
         {/* Inquiry List */}
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="p-16 rounded-2xl bg-[#0a192f] border border-slate-800 text-center text-slate-400">
+            <Loader2 className="w-8 h-8 text-secondary animate-spin mx-auto mb-3" />
+            <p className="text-xs">Loading customer enquiries...</p>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="p-16 rounded-2xl bg-[#0a192f] border border-slate-800 text-center">
             <Inbox className="w-12 h-12 text-slate-600 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-white mb-1">No Inquiries Matching Filter</h3>

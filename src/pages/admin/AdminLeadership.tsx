@@ -9,7 +9,6 @@ import {
   ProfileSkill, 
   SkillCategory 
 } from '../../types';
-import { initialLeadership } from '../../data/initialData';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { 
@@ -63,7 +62,8 @@ const SKILL_CATEGORIES: SkillCategory[] = [
 
 export const AdminLeadership: React.FC = () => {
   const { showToast } = useToast();
-  const [members, setMembers] = useState<LeadershipMember[]>(initialLeadership);
+  const [members, setMembers] = useState<LeadershipMember[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -77,10 +77,21 @@ export const AdminLeadership: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<LeadershipMember | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
+  const loadData = () => {
+    setLoading(true);
     dataService.getLeadership().then(loaded => {
-      setMembers(loaded);
+      setMembers(loaded || []);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
+      setLoading(false);
     });
+  };
+
+  useEffect(() => {
+    loadData();
+    window.addEventListener('ravan_data_updated', loadData);
+    return () => window.removeEventListener('ravan_data_updated', loadData);
   }, []);
 
   const getActiveTab = (memberId: string): string => {

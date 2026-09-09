@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
 import { ClientItem } from '../../types';
-import { initialClients } from '../../data/initialData';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import {
@@ -57,7 +56,7 @@ export const AdminClients: React.FC = () => {
     setLoading(true);
     try {
       const data = await dataService.getClients();
-      setClients(data && data.length > 0 ? data : initialClients);
+      setClients(data || []);
     } catch (e) {
       console.error(e);
       showToast('Failed to load clients from database.', 'error');

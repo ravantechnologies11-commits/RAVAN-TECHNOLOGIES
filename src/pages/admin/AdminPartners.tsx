@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
 import { PartnerItem } from '../../types';
-import { initialPartners } from '../../data/initialData';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import {
@@ -59,7 +58,7 @@ export const AdminPartners: React.FC = () => {
     setLoading(true);
     try {
       const data = await dataService.getPartners();
-      setPartners(data && data.length > 0 ? data : initialPartners);
+      setPartners(data || []);
     } catch (e) {
       console.error(e);
       showToast('Failed to load partners from database.', 'error');

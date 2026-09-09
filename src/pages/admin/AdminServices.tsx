@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { dataService, generateSlug } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
 import { ServiceItem, ServiceFeature } from '../../types';
-import { initialServices } from '../../data/initialData';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import {
@@ -54,8 +53,8 @@ const ICON_PRESETS = [
 
 export const AdminServices: React.FC = () => {
   const { showToast } = useToast();
-  const [services, setServices] = useState<ServiceItem[]>(initialServices);
-  const [originalServices, setOriginalServices] = useState<ServiceItem[]>(initialServices);
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [originalServices, setOriginalServices] = useState<ServiceItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);

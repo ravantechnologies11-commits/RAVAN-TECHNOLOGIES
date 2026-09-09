@@ -51,12 +51,18 @@ export const AdminSEO: React.FC = () => {
   const [showCropModal, setShowCropModal] = useState(false);
   const [copiedSchema, setCopiedSchema] = useState(false);
 
-  useEffect(() => {
+  const loadAll = () => {
     dataService.getSEOSettings().then(setSeo);
     dataService.getSiteSettings().then(setSite);
     dataService.getFounder().then(setFounder);
     dataService.getLeadership().then(setLeadership);
     dataService.getSEOHealthReport().then(setHealthIssues);
+  };
+
+  useEffect(() => {
+    loadAll();
+    window.addEventListener('ravan_data_updated', loadAll);
+    return () => window.removeEventListener('ravan_data_updated', loadAll);
   }, []);
 
   const handleSaveGeneral = async (e: React.FormEvent) => {

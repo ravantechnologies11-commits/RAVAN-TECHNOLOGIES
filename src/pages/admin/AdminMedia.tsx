@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { dataService } from '../../lib/dataService';
 import { useToast } from '../../context/ToastContext';
 import { MediaItem } from '../../types';
-import { initialMedia } from '../../data/initialData';
 import { DeleteConfirmationModal } from '../../components/admin/DeleteConfirmationModal';
 import { ImageCropModal, CropResult } from '../../components/admin/ImageCropModal';
 import {
@@ -56,7 +55,7 @@ export const AdminMedia: React.FC = () => {
     setLoading(true);
     try {
       const data = await dataService.getMedia();
-      setMediaList(data && data.length > 0 ? data : initialMedia);
+      setMediaList(data || []);
     } catch (e) {
       console.error(e);
       showToast('Failed to load media assets from database.', 'error');
