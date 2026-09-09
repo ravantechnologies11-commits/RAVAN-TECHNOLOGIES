@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   CheckCircle2
 } from 'lucide-react';
+import { sanitizeUrl } from '../../lib/securityUtils';
 
 const isValidHttpUrl = (urlStr: string): boolean => {
   if (!urlStr || !urlStr.trim()) return true;
@@ -255,7 +256,7 @@ export const AdminPartners: React.FC = () => {
                     <h3 className="text-sm font-bold text-white leading-tight">{p.name}</h3>
                     {p.website_url && (
                       <a
-                        href={p.website_url}
+                        href={sanitizeUrl(p.website_url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[10px] text-secondary hover:underline flex items-center gap-1 mt-0.5 font-mono"

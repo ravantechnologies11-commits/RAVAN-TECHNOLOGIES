@@ -26,6 +26,60 @@ function isSafeSvg(svgText: string): boolean {
   return !dangerousPatterns.some(pattern => lower.includes(pattern));
 }
 
+/**
+ * Inspects initial header bytes of a file to verify true image formats.
+ * Prevents disguised executable/script payloads from masquerading as images.
+ */
+export async function verifyImageMagicBytes(file: File): Promise<{ valid: boolean; error?: string }> {
+  if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+    try {
+      const text = await file.text();
+      if (!text.includes('<svg') || !isSafeSvg(text)) {
+        return { valid: false, error: 'Malicious or invalid SVG vector code detected.' };
+      }
+      return { valid: true };
+    } catch {
+      return { valid: false, error: 'Failed to parse SVG file safely.' };
+    }
+  }
+
+  try {
+    const buffer = await file.slice(0, 16).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    if (bytes.length < 4) {
+      return { valid: false, error: 'File is too small to be a valid image.' };
+    }
+
+    // JPEG: FF D8 FF
+    const isJpeg = bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
+    // PNG: 89 50 4E 47
+    const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+    // GIF: 47 49 46 38 ('GIF8')
+    const isGif = bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38;
+    // WEBP: RIFF....WEBP (52 49 46 46 .... 57 45 42 50)
+    const isWebp = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+                   bytes.length >= 12 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+    // BMP: 42 4D
+    const isBmp = bytes[0] === 0x42 && bytes[1] === 0x4D;
+    // TIFF: 49 49 2A 00 or 4D 4D 00 2A
+    const isTiff = (bytes[0] === 0x49 && bytes[1] === 0x49 && bytes[2] === 0x2A && bytes[3] === 0x00) ||
+                   (bytes[0] === 0x4D && bytes[1] === 0x4D && bytes[2] === 0x00 && bytes[3] === 0x2A);
+    // HEIC/AVIF: 'ftyp' box starting at byte 4: 66 74 79 70
+    const isFtyp = bytes.length >= 8 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70;
+
+    if (isJpeg || isPng || isGif || isWebp || isBmp || isTiff || isFtyp) {
+      return { valid: true };
+    }
+
+    return {
+      valid: false,
+      error: 'Security alert: File binary signature does not match any valid image format.'
+    };
+  } catch {
+    return { valid: true };
+  }
+}
+
 function formatStorageError(error: any, bucket: string): Error {
   const msg = error?.message || '';
   if (msg.toLowerCase().includes('bucket not found') || msg.toLowerCase().includes('not found') || msg.includes('404')) {
@@ -89,16 +143,10 @@ export const storageService = {
         throw new Error(validation.error);
       }
 
-      // Deep SVG security verification
-      if (file.type === 'image/svg+xml') {
-        try {
-          const text = await file.text();
-          if (!text.includes('<svg') || !isSafeSvg(text)) {
-            throw new Error('Malicious or invalid SVG vector code detected.');
-          }
-        } catch (err: any) {
-          throw new Error(err.message || 'Failed to parse SVG file safely.');
-        }
+      // Deep binary header / magic bytes verification (rejects executables disguised with image extensions)
+      const magicCheck = await verifyImageMagicBytes(file);
+      if (!magicCheck.valid) {
+        throw new Error(magicCheck.error);
       }
     }
 

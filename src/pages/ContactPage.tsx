@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { SEOHead } from '../components/common/SEOHead';
 import { dataService } from '../lib/dataService';
 import { useToast } from '../context/ToastContext';
 import { Mail, Phone, MapPin, Send, CheckCircle2, ShieldCheck, Clock } from 'lucide-react';
+import { validateContactPayload, sanitizeUrl } from '../lib/securityUtils';
 
 import { SiteSettings } from '../types';
 
 export const ContactPage: React.FC = () => {
   const { showToast } = useToast();
   const [site, setSite] = useState<SiteSettings>(() => dataService.getSiteSettingsSync());
+  const formLoadTimeRef = useRef<number>(Date.now());
+  const [honeypot, setHoneypot] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -49,8 +52,24 @@ export const ContactPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-      showToast('Please complete all required fields.', 'error');
+
+    // Anti-spam defense: Honeypot trap check
+    if (honeypot.trim()) {
+      // Silently discard automated bot spam without error indication
+      setSubmittedRef(`REF-SEC-${Date.now().toString(36).toUpperCase()}`);
+      return;
+    }
+
+    // Anti-spam defense: Reject sub-second machine submissions
+    if (Date.now() - formLoadTimeRef.current < 1500) {
+      showToast('Submission rejected: automated input pattern detected.', 'error');
+      return;
+    }
+
+    // Rigorous security validation (length bounds, strict email regex, anti-CRLF injection)
+    const validation = validateContactPayload(formData);
+    if (!validation.valid) {
+      showToast(validation.error || 'Please complete all required fields correctly.', 'error');
       return;
     }
 
@@ -188,6 +207,20 @@ export const ContactPage: React.FC = () => {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Anti-spam honeypot (hidden from human visitors) */}
+                  <div style={{ display: 'none' }} aria-hidden="true">
+                    <label htmlFor="company_hp">Do not fill this field</label>
+                    <input
+                      id="company_hp"
+                      type="text"
+                      name="_hp_company"
+                      value={honeypot}
+                      onChange={e => setHoneypot(e.target.value)}
+                      tabIndex={-1}
+                      autoComplete="off"
+                    />
+                  </div>
+
                   <div>
                     <h3 className="text-2xl font-bold font-display text-primary mb-2">
                       Direct Engagement Form

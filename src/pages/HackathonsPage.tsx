@@ -6,6 +6,7 @@ import { dataService } from '../lib/dataService';
 import { HackathonItem } from '../types';
 import { Calendar, Trophy, ArrowRight, Code2, Award, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { sanitizeUrl } from '../lib/securityUtils';
 
 export const HackathonsPage: React.FC = () => {
   const [hackathon, setHackathon] = useState<HackathonItem | null>(() => dataService.getCachedHackathon());
@@ -167,9 +168,8 @@ export const HackathonsPage: React.FC = () => {
 
             {/* Registration CTA - Strictly Database Driven with Protocol Validation */}
             {(() => {
-              const regUrl = (hackathon.registration_url || '').trim();
-              const isExternal = /^https?:\/\//i.test(regUrl);
-              const isSafe = !/^(javascript|data|vbscript):/i.test(regUrl);
+              const safeRegUrl = sanitizeUrl(hackathon.registration_url);
+              const isExternal = /^https?:\/\//i.test(safeRegUrl);
               const isClosed = hackathon.status === 'completed';
 
               if (isClosed) {
@@ -180,10 +180,10 @@ export const HackathonsPage: React.FC = () => {
                 );
               }
 
-              if (regUrl && isSafe && isExternal) {
+              if (safeRegUrl && isExternal) {
                 return (
                   <a
-                    href={regUrl}
+                    href={safeRegUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white rounded font-semibold text-xs tracking-widest uppercase hover:bg-primary-container transition-colors shadow-lg"
@@ -194,7 +194,7 @@ export const HackathonsPage: React.FC = () => {
                 );
               }
 
-              const targetPath = regUrl && isSafe ? (regUrl.startsWith('/') ? regUrl : `/${regUrl}`) : '/contact';
+              const targetPath = safeRegUrl && safeRegUrl.startsWith('/') ? safeRegUrl : '/contact';
               return (
                 <Link
                   to={targetPath}

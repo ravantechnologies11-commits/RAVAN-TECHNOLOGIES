@@ -62,6 +62,7 @@ import {
   initialRoles,
   initialAIMLModels
 } from '../data/initialData';
+import { validateContactPayload, sanitizeUrl } from './securityUtils';
 
 // Local Storage Resilient Fallbacks & Cross-Session Persistent Cache Store
 const getLocal = <T>(key: string, fallback: T): T => {
@@ -3161,16 +3162,22 @@ export const dataService = {
     } catch {}
 
     // 3. Payload sanitization & validation
+    const validation = validateContactPayload({
+      name: enquiry.name,
+      email: enquiry.email,
+      message: enquiry.message,
+      organization: enquiry.organization || enquiry.company,
+      phone: enquiry.phone
+    });
+    if (!validation.valid) {
+      return { success: false, reference_id: '', message: validation.error || 'Please provide a valid name, email address, and message requirements.' };
+    }
+
     const cleanName = (enquiry.name || '').trim().slice(0, 100);
     const cleanEmail = (enquiry.email || '').trim().toLowerCase().slice(0, 120);
     const cleanOrg = (enquiry.organization || enquiry.company || '').trim().slice(0, 120);
     const cleanPhone = (enquiry.phone || '').trim().slice(0, 40);
-    const cleanMessage = (enquiry.message || '').trim().slice(0, 3000);
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!cleanName || !cleanEmail || !emailRegex.test(cleanEmail) || !cleanMessage) {
-      return { success: false, reference_id: '', message: 'Please provide a valid name, email address, and message requirements.' };
-    }
+    const cleanMessage = (enquiry.message || '').trim().slice(0, 5000);
 
     // Generate unique human-readable reference ID
     const randomSeq = Math.floor(100000 + Math.random() * 900000);
@@ -3204,7 +3211,6 @@ export const dataService = {
       if (supabase) {
         await supabase.from('contact_inquiries').insert([newEnquiry]);
       }
-      await this.addAuditLog('CREATE', 'ENQUIRIES', newEnquiry.id, `New inquiry [${reference_id}] received from ${newEnquiry.name}`);
     } catch (err) {
       if (import.meta.env.DEV) console.error('Error inserting inquiry into Supabase:', err);
     }
@@ -3992,7 +3998,11 @@ export const dataService = {
 
     try {
       if (supabase) {
-        await supabase.from('audit_logs').insert([newLog]);
+        // RLS Guard: Only attempt remote audit log insert if session is authenticated
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await supabase.from('audit_logs').insert([newLog]);
+        }
       }
     } catch (err) {
       if (import.meta.env.DEV) console.error('Error logging audit action to Supabase:', err);

@@ -2,6 +2,7 @@ import React from 'react';
 import { ProfileProject } from '../../types';
 import { Layers, ExternalLink, Github, Sparkles, CheckCircle, Clock } from 'lucide-react';
 import { isDisplayableSocialUrl } from '../../lib/socialUtils';
+import { sanitizeUrl } from '../../lib/securityUtils';
 
 interface ProfileProjectsSectionProps {
   projects?: ProfileProject[];
@@ -131,7 +132,7 @@ export const ProfileProjectsSection: React.FC<ProfileProjectsSectionProps> = ({ 
                 <div className="pt-4 mt-4 border-t border-outline-variant/50 flex flex-wrap items-center gap-3">
                   {proj.project_url && isDisplayableSocialUrl(proj.project_url) && (
                     <a
-                      href={proj.project_url}
+                      href={sanitizeUrl(proj.project_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-container text-xs font-bold uppercase tracking-wider transition-colors shadow-xs"
@@ -142,7 +143,7 @@ export const ProfileProjectsSection: React.FC<ProfileProjectsSectionProps> = ({ 
                   )}
                   {proj.github_url && isDisplayableSocialUrl(proj.github_url) && (
                     <a
-                      href={proj.github_url}
+                      href={sanitizeUrl(proj.github_url)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-surface-container hover:bg-surface-container-high border border-outline-variant text-xs font-semibold text-primary transition-colors"

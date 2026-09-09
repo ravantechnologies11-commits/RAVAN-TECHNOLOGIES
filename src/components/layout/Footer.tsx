@@ -13,6 +13,7 @@ import {
 import { BrandLogo } from '../common/BrandLogo';
 import { dataService } from '../../lib/dataService';
 import { isDisplayableSocialUrl } from '../../lib/socialUtils';
+import { sanitizeUrl } from '../../lib/securityUtils';
 import { SiteSettings } from '../../types';
 
 interface CompanySocialItem {
@@ -151,7 +152,7 @@ export const Footer: React.FC = () => {
                 {displayableSocials.map(item => (
                   <a
                     key={item.id}
-                    href={item.url}
+                    href={sanitizeUrl(item.url)}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={item.ariaLabel}

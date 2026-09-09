@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { SocialLinks } from '../../types';
 import { isDisplayableSocialUrl, SupportedPlatformId } from '../../lib/socialUtils';
+import { sanitizeUrl } from '../../lib/securityUtils';
 
 interface SocialProfilesListProps {
   socialLinks?: SocialLinks;
@@ -125,7 +126,7 @@ export const SocialProfilesList: React.FC<SocialProfilesListProps> = ({
           return (
             <a
               key={platform.id}
-              href={url}
+              href={sanitizeUrl(url)}
               target="_blank"
               rel="noopener noreferrer"
               className={`p-2.5 rounded-lg bg-surface-container text-on-surface-variant transition-all duration-200 border border-outline-variant flex items-center gap-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-secondary ${platform.colorClass} shadow-sm group`}
@@ -141,7 +142,7 @@ export const SocialProfilesList: React.FC<SocialProfilesListProps> = ({
 
         {hasDisplayableEmail && (
           <a
-            href={`mailto:${publicEmail!.trim()}`}
+            href={sanitizeUrl(`mailto:${publicEmail!.trim()}`)}
             className="p-2.5 rounded-lg bg-surface-container hover:bg-secondary hover:text-[#0a192f] text-on-surface-variant transition-colors border border-outline-variant flex items-center gap-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-secondary shadow-sm"
             aria-label={`Send an email to ${memberName}`}
             title={`Email: ${publicEmail}`}
