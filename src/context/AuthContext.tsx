@@ -18,6 +18,7 @@ const AUTHORIZED_ADMIN_ROLES = ['super_admin', 'admin'];
 // Primary executive administrator accounts and authorized emails
 export const AUTHORIZED_ADMIN_EMAILS: readonly string[] = [
   'ravantechnologies11@gmail.com',
+  'ravantechnology001@gmail.com',
   'founder@ravantechnologies.in',
   'ceo@ravantechnologies.in',
   'admin@ravantechnologies.in'
